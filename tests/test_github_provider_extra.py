@@ -161,6 +161,15 @@ def test_fetch_tags_paginates_until_short_page() -> None:
     assert tags[-1] == "tag-100"
 
 
+def test_fetch_tags_stops_on_empty_payload() -> None:
+    provider = GitHubProvider()
+    provider._get_json = lambda path, params=None: []  # type: ignore[method-assign]
+    try:
+        assert provider._fetch_tags("AnnAngela", "demo") == []
+    finally:
+        provider.close()
+
+
 def test_get_json_retries_http_errors_and_wraps_failures(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("pypi_package_changelog_generator.providers.github.time.sleep", lambda _: None)
     attempts = {"count": 0}
@@ -202,6 +211,14 @@ def test_get_json_handles_retryable_and_final_http_statuses(monkeypatch: pytest.
     provider = GitHubProvider(max_retries=1, transport=httpx.MockTransport(lambda _: queued.popleft()))
     try:
         assert provider._get_json("/demo") == {"ok": True}
+    finally:
+        provider.close()
+
+    provider = GitHubProvider(max_retries=-1)
+    try:
+        with pytest.raises(ProviderError) as exc_info:
+            provider._get_json("/demo")
+        assert exc_info.value.code == "github_retry_exhausted"
     finally:
         provider.close()
 

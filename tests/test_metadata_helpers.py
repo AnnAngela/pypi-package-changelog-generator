@@ -55,12 +55,16 @@ dev =
 
     metadata = parse_project_metadata(root)
 
-    assert metadata.source == "setup.cfg"
-    assert metadata.dependencies == {
+    assert metadata.source == "nested/pyproject.toml"
+    assert metadata.license == "LICENSE"
+    setup_cfg = _parse_setup_cfg(root / "setup.cfg")
+    assert setup_cfg.dependencies == {
         "requests": "requests>=2",
         "extra:dev:pytest": "pytest>=8",
     }
-    assert metadata.classifiers == ["Programming Language :: Python"]
+    assert setup_cfg.classifiers == ["Programming Language :: Python"]
+    assert setup_cfg.requires_python == ">=3.9"
+    assert metadata.dependencies == {}
     assert _find_shallowest(root, "missing.toml") is None
 
 
@@ -101,7 +105,10 @@ Requires-Dist: httpx>=0.27
     )
     parsed_pkg = _parse_pkg_info(pkg_info / "PKG-INFO")
     assert parsed_pkg.dependencies == {"httpx": "httpx>=0.27"}
-    assert parse_project_metadata(tmp_path / "empty") == ParsedProjectMetadata()
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert parse_project_metadata(empty) == ParsedProjectMetadata()
+    assert parse_project_metadata(None) == ParsedProjectMetadata()
 
 
 def test_parse_setup_py_supports_setup_and_setuptools_setup(tmp_path: Path) -> None:
@@ -144,9 +151,9 @@ setuptools.setup()
 
 
 def test_metadata_helpers_cover_edge_cases(tmp_path: Path) -> None:
-    assert compare_dependencies({"a": "a>=1", "b": "b>=1"}, {"b": "b>=2", "c": "c>=1"}) == [
+    assert compare_dependencies({"a": "a>=1", "b": "b>=1", "c": "c>=1"}, {"b": "b>=2", "c": "c>=1", "d": "d>=1"}) == [
         {"kind": "removed", "name": "a", "before": "a>=1", "after": None},
-        {"kind": "added", "name": "c", "before": None, "after": "c>=1"},
+        {"kind": "added", "name": "d", "before": None, "after": "d>=1"},
         {"kind": "changed", "name": "b", "before": "b>=1", "after": "b>=2"},
     ]
     assert compare_python_floor(">=3.8", ">=3.8") is None
@@ -178,12 +185,13 @@ def test_metadata_helpers_cover_edge_cases(tmp_path: Path) -> None:
         {"field": "license", "before": "MIT", "after": "Apache-2.0", "source": "setup.cfg"}
     ]
     assert _extract_min_python(None) is None
-    assert _extract_min_python(">=3.8, ==3.9, >invalid") == Version("3.9")
+    assert _extract_min_python(">=3.8, ==3.9, >3..1") == Version("3.9")
     assert _looks_public_python_module("pkg/module.py") is True
     assert _looks_public_python_module("docs/conf.py") is False
     assert _module_qualname(None) is None
     assert _module_qualname("README.md") is None
     assert _module_qualname("./src/pkg/__init__.py") == "pkg"
+    assert _module_qualname("/__init__.py") is None
     assert _module_qualname("tests/test_demo.py") is None
     assert _module_qualname("pkg/module.py") == "pkg.module"
 
@@ -219,6 +227,7 @@ license = {text = "MIT"}
         from_root=from_root,
         to_root=to_root,
         file_changes=[
+            {"path": "pkg/keep.txt", "status": "modified"},
             {
                 "path": "pkg/renamed.py",
                 "previous_path": "pkg/original.py",

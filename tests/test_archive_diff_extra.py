@@ -12,6 +12,7 @@ from pypi_package_changelog_generator.archive_diff import (
     ArchiveDiffError,
     ExtractedArchive,
     _decode_lines,
+    _is_safe_tar_member,
     _should_skip,
     build_file_changes,
     compare_release_archives,
@@ -101,6 +102,8 @@ def test_build_file_changes_covers_added_removed_modified_binary_and_skipped_fil
     (to_root / "pkg" / "new.txt").write_text("rename me\n", encoding="utf-8")
     (to_root / "pkg" / "added.txt").write_text("one\ntwo\n", encoding="utf-8")
     (from_root / "pkg" / "removed.txt").write_text("gone\n", encoding="utf-8")
+    (from_root / "pkg" / "unchanged.txt").write_text("same\n", encoding="utf-8")
+    (to_root / "pkg" / "unchanged.txt").write_text("same\n", encoding="utf-8")
     (from_root / "pkg" / "image.bin").write_bytes(b"\0before")
     (to_root / "pkg" / "image.bin").write_bytes(b"\0after")
     (from_root / ".git").mkdir()
@@ -120,6 +123,19 @@ def test_build_file_changes_covers_added_removed_modified_binary_and_skipped_fil
     assert _should_skip(Path(".git/ignored.txt")) is True
     assert _should_skip(Path("pkg/compiled.pyc")) is True
     assert _should_skip(Path("pkg/module.py")) is False
+
+
+def test_is_safe_tar_member_rejects_symlink_escape(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "linked").symlink_to(outside, target_is_directory=True)
+
+    member = tarfile.TarInfo("linked/escape.txt")
+    member.size = 1
+
+    assert _is_safe_tar_member(root.resolve(), member) is False
 
 
 def test_archive_cleanup_helpers_remove_temporary_directories() -> None:

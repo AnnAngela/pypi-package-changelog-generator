@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import runpy
+import sys
 
 import pytest
 
@@ -293,8 +294,13 @@ def test_module_main_entrypoint_raises_system_exit(monkeypatch: pytest.MonkeyPat
             raise PypiClientError("pypi_http_error", "failed")
 
     monkeypatch.setattr("pypi_package_changelog_generator.pypi_client.PypiClient", FakeClient)
+    existing = sys.modules.pop("pypi_package_changelog_generator.cli", None)
 
-    with pytest.raises(SystemExit) as exc_info:
-        runpy.run_module("pypi_package_changelog_generator.cli", run_name="__main__")
+    try:
+        with pytest.raises(SystemExit) as exc_info:
+            runpy.run_module("pypi_package_changelog_generator.cli", run_name="__main__")
+    finally:
+        if existing is not None:
+            sys.modules["pypi_package_changelog_generator.cli"] = existing
 
     assert exc_info.value.code == 0

@@ -13,17 +13,19 @@ def test_apply_budget_truncates_patches_and_counts_omissions() -> None:
         reviews=[{"id": 1}],
         file_changes=[
             {"path": "pkg/module.py", "status": "modified", "changes": 2, "patch": "abcdef"},
+            {"path": "pkg/short.py", "status": "modified", "changes": 1, "patch": "abc"},
             {"path": "README.md", "status": "modified", "changes": 1, "patch": None},
         ],
     )
 
-    apply_budget(result, max_commits=1, max_reviews=1, max_files=1, max_patch_chars=4)
+    apply_budget(result, max_commits=1, max_reviews=1, max_files=2, max_patch_chars=4)
 
     assert result.truncation.truncated is True
     assert result.truncation.reason == "patch excerpts were shortened to fit the evidence budget"
     assert result.truncation.omitted_commits == 1
     assert result.truncation.omitted_files == 1
     assert result.file_changes[0]["patch"] == "abcd\n...<truncated>...\n"
+    assert result.file_changes[1]["patch"] == "abc"
 
 
 def test_apply_budget_sets_review_reason_when_only_reviews_are_truncated() -> None:

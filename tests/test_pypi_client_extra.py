@@ -32,6 +32,7 @@ def test_pypi_client_methods_use_expected_endpoints_and_extract_values() -> None
             {"info": {"project_urls": {"Docs": "https://example.com/demo"}}},
             release,
         ) == "https://github.com/AnnAngela/demo"
+        assert client.extract_repository_url({"info": {"project_urls": {"Docs": "https://example.com/demo"}}}) is None
     finally:
         client.close()
 

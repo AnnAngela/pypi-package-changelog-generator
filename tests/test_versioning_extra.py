@@ -60,4 +60,5 @@ def test_version_resolution_errors_and_helpers() -> None:
         "python-v1.2.3",
     ]
     assert _looks_like_prerelease("1.0.0-preview1") is True
-    assert _legacy_sort_key("1.0.0-beta1") == ((0, 1), (0, 0), (1, "beta", 1))
+    assert _legacy_sort_key("1.0.0-beta1") == ((0, 1), (0, 0), (0, 0), (1, "beta", 1))
+    assert _legacy_sort_key("1..0") == ((0, 1), (0, 0))
