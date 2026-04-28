@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8.2.0",
+  "pytest-cov>=7.1.0",
 ]
 
 [project.scripts]
@@ -34,3 +35,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = [
+  "--cov=src/pypi_package_changelog_generator",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
