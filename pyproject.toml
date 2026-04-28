@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypi-package-changelog-generator"
+version = "0.1.0"
+description = "Generate structured changelog inputs for PyPI package version diffs."
+readme = "LICENSE"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "AnnAngela" }
+]
+dependencies = [
+  "packaging>=24.0",
+  "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+]
+
+[project.scripts]
+pypi-package-changelog = "pypi_package_changelog_generator.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

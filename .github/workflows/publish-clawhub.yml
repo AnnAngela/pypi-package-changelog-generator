@@ -1,0 +1,100 @@
+name: Publish ClawHub Skill
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version to publish, for example 0.1.0"
+        required: false
+      changelog:
+        description: "Release notes for ClawHub"
+        required: false
+  push:
+    branches:
+      - "master"
+    tags:
+      - "v*"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Run tests
+        run: pytest
+
+      - name: Check CLI help
+        run: python -m pypi_package_changelog_generator.cli --help
+
+      - name: Verify skill file exists
+        run: test -f skills/pypi-package-changelog/SKILL.md
+
+  publish:
+    needs:
+      - validate
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Resolve version and changelog
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            changelog="Release ${version}"
+          else
+            version="${{ github.event.inputs.version }}"
+            changelog="${{ github.event.inputs.changelog || '' }}"
+            if [[ -z "$version" ]]; then
+              echo "workflow_dispatch requires a version input" >&2
+              exit 1
+            fi
+            if [[ -z "$changelog" ]]; then
+              changelog="Release ${version}"
+            fi
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)*$ ]]; then
+            echo "Version must be semver compatible: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "changelog=$changelog" >> "$GITHUB_OUTPUT"
+
+      - name: Install ClawHub CLI
+        run: npm install -g clawhub
+
+      - name: Authenticate ClawHub CLI
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          test -n "$CLAWHUB_TOKEN"
+          clawhub login --token "$CLAWHUB_TOKEN"
+          clawhub whoami --no-input
+
+      - name: Publish skill
+        run: |
+          clawhub skill publish skills/pypi-package-changelog \
+            --version "${{ steps.release.outputs.version }}" \
+            --tags latest \
+            --changelog "${{ steps.release.outputs.changelog }}" \
+            --no-input
