@@ -100,7 +100,7 @@ def test_extract_archive_cleans_up_tempdir_on_unsafe_entry(
     with pytest.raises(ArchiveDiffError):
         extract_archive(content)
 
-    assert TrackingTemporaryDirectory.instances
+    assert len(TrackingTemporaryDirectory.instances) == 1
     temp_dir = TrackingTemporaryDirectory.instances[0]
     assert temp_dir.cleaned is True
     assert not Path(temp_dir.name).exists()
