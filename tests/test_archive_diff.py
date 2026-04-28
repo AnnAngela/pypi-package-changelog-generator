@@ -64,10 +64,11 @@ def test_extract_archive_rejects_unsafe_entries(name: str, entry_type: bytes) ->
             payload = b"blocked\n"
             info.size = len(payload)
             archive.addfile(info, BytesIO(payload))
-            return
-        if entry_type in {tarfile.SYMTYPE, tarfile.LNKTYPE}:
+        elif entry_type in {tarfile.SYMTYPE, tarfile.LNKTYPE}:
             info.linkname = "target"
-        archive.addfile(info)
+            archive.addfile(info)
+        else:
+            archive.addfile(info)
 
     with pytest.raises(ArchiveDiffError, match="unsafe entry"):
         extract_archive(_build_tar_archive(configure))

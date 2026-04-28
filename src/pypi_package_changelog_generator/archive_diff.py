@@ -77,7 +77,7 @@ def _is_safe_tar_member(root: Path, member: tarfile.TarInfo) -> bool:
         return False
     if ".." in member_posix_path.parts:
         return False
-    destination = (root / Path(*member_posix_path.parts)).resolve(strict=False)
+    destination = root.joinpath(*member_posix_path.parts).resolve(strict=False)
     if not destination.is_relative_to(root):
         return False
     return member.isdir() or member.isreg()
