@@ -67,11 +67,32 @@ def compare_release_archives(
     )
 
 
+def _is_safe_tar_member(member: tarfile.TarInfo) -> bool:
+    member_path = Path(member.name)
+    if member_path.is_absolute():
+        return False
+    if ".." in member_path.parts:
+        return False
+    if member.issym() or member.islnk():
+        return False
+    if member.isdev():
+        return False
+    return True
+
+
 def extract_archive(content: bytes) -> ExtractedArchive:
     temp_dir = tempfile.TemporaryDirectory(prefix="pypi-changelog-")
     root = Path(temp_dir.name)
     with tarfile.open(fileobj=BytesIO(content), mode="r:gz") as archive:
-        archive.extractall(root)
+        safe_members = []
+        for member in archive.getmembers():
+            if not _is_safe_tar_member(member):
+                raise ArchiveDiffError(
+                    code="unsafe_archive_entry",
+                    message=f"Archive contains unsafe entry: {member.name}",
+                )
+            safe_members.append(member)
+        archive.extractall(root, members=safe_members)
     children = [path for path in root.iterdir()]
     if len(children) == 1 and children[0].is_dir():
         extracted_root = children[0]
