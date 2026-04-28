@@ -89,15 +89,14 @@ def extract_archive(content: bytes) -> ExtractedArchive:
     root_resolved = root.resolve()
     try:
         with tarfile.open(fileobj=BytesIO(content), mode="r:gz") as archive:
-            safe_members = []
-            for member in archive.getmembers():
+            members = archive.getmembers()
+            for member in members:
                 if not _is_safe_tar_member(root_resolved, member):
                     raise ArchiveDiffError(
                         code="unsafe_archive_entry",
                         message=f"Archive contains unsafe entry: {member.name}",
                     )
-                safe_members.append(member)
-            archive.extractall(root, members=safe_members, filter="data")
+            archive.extractall(root, members=members, filter="data")
         children = [path for path in root.iterdir()]
         if len(children) == 1 and children[0].is_dir():
             extracted_root = children[0]
