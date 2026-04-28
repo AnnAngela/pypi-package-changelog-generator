@@ -6,7 +6,7 @@ import tarfile
 import tempfile
 from dataclasses import dataclass
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from pypi_package_changelog_generator.pypi_client import PypiClient, PypiClientError
@@ -67,17 +67,45 @@ def compare_release_archives(
     )
 
 
+def _is_safe_tar_member(root: Path, member: tarfile.TarInfo) -> bool:
+    member_name = member.name.replace("\\", "/")
+    member_posix_path = PurePosixPath(member_name)
+    member_windows_path = PureWindowsPath(member_name)
+    if member_posix_path.is_absolute() or member_windows_path.is_absolute():
+        return False
+    if member_windows_path.drive:
+        return False
+    if ".." in member_posix_path.parts:
+        return False
+    destination = root.joinpath(*member_posix_path.parts).resolve(strict=False)
+    if not destination.is_relative_to(root):
+        return False
+    return member.isdir() or member.isreg()
+
+
 def extract_archive(content: bytes) -> ExtractedArchive:
     temp_dir = tempfile.TemporaryDirectory(prefix="pypi-changelog-")
     root = Path(temp_dir.name)
-    with tarfile.open(fileobj=BytesIO(content), mode="r:gz") as archive:
-        archive.extractall(root)
-    children = [path for path in root.iterdir()]
-    if len(children) == 1 and children[0].is_dir():
-        extracted_root = children[0]
-    else:
-        extracted_root = root
-    return ExtractedArchive(root=extracted_root, temp_dir=temp_dir)
+    root_resolved = root.resolve()
+    try:
+        with tarfile.open(fileobj=BytesIO(content), mode="r:gz") as archive:
+            members = archive.getmembers()
+            for member in members:
+                if not _is_safe_tar_member(root_resolved, member):
+                    raise ArchiveDiffError(
+                        code="unsafe_archive_entry",
+                        message=f"Archive contains unsafe entry: {member.name}",
+                    )
+            archive.extractall(root, members=members, filter="data")
+        children = [path for path in root.iterdir()]
+        if len(children) == 1 and children[0].is_dir():
+            extracted_root = children[0]
+        else:
+            extracted_root = root
+        return ExtractedArchive(root=extracted_root, temp_dir=temp_dir)
+    except Exception:
+        temp_dir.cleanup()
+        raise
 
 
 def build_file_changes(from_root: Path, to_root: Path) -> list[dict[str, Any]]:
