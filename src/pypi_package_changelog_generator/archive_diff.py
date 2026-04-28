@@ -6,7 +6,7 @@ import tarfile
 import tempfile
 from dataclasses import dataclass
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from pypi_package_changelog_generator.pypi_client import PypiClient, PypiClientError
@@ -67,38 +67,46 @@ def compare_release_archives(
     )
 
 
-def _is_safe_tar_member(member: tarfile.TarInfo) -> bool:
-    member_path = Path(member.name)
-    if member_path.is_absolute():
+def _is_safe_tar_member(root: Path, member: tarfile.TarInfo) -> bool:
+    member_name = member.name.replace("\\", "/")
+    member_posix_path = PurePosixPath(member_name)
+    member_windows_path = PureWindowsPath(member_name)
+    if member_posix_path.is_absolute() or member_windows_path.is_absolute():
         return False
-    if ".." in member_path.parts:
+    if member_windows_path.drive:
         return False
-    if member.issym() or member.islnk():
+    if ".." in member_posix_path.parts:
         return False
-    if member.isdev():
+    destination = (root / Path(*member_posix_path.parts)).resolve(strict=False)
+    if not destination.is_relative_to(root):
         return False
-    return True
+    return member.isdir() or member.isreg()
 
 
 def extract_archive(content: bytes) -> ExtractedArchive:
     temp_dir = tempfile.TemporaryDirectory(prefix="pypi-changelog-")
     root = Path(temp_dir.name)
-    with tarfile.open(fileobj=BytesIO(content), mode="r:gz") as archive:
-        safe_members = []
-        for member in archive.getmembers():
-            if not _is_safe_tar_member(member):
-                raise ArchiveDiffError(
-                    code="unsafe_archive_entry",
-                    message=f"Archive contains unsafe entry: {member.name}",
-                )
-            safe_members.append(member)
-        archive.extractall(root, members=safe_members)
-    children = [path for path in root.iterdir()]
-    if len(children) == 1 and children[0].is_dir():
-        extracted_root = children[0]
-    else:
-        extracted_root = root
-    return ExtractedArchive(root=extracted_root, temp_dir=temp_dir)
+    root_resolved = root.resolve()
+    try:
+        with tarfile.open(fileobj=BytesIO(content), mode="r:gz") as archive:
+            safe_members = []
+            for member in archive.getmembers():
+                if not _is_safe_tar_member(root_resolved, member):
+                    raise ArchiveDiffError(
+                        code="unsafe_archive_entry",
+                        message=f"Archive contains unsafe entry: {member.name}",
+                    )
+                safe_members.append(member)
+            archive.extractall(root, members=safe_members, filter="data")
+        children = [path for path in root.iterdir()]
+        if len(children) == 1 and children[0].is_dir():
+            extracted_root = children[0]
+        else:
+            extracted_root = root
+        return ExtractedArchive(root=extracted_root, temp_dir=temp_dir)
+    except Exception:
+        temp_dir.cleanup()
+        raise
 
 
 def build_file_changes(from_root: Path, to_root: Path) -> list[dict[str, Any]]:
