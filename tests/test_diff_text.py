@@ -75,3 +75,10 @@ def test_format_git_diff_patch_formats_binary_notes_and_truncates() -> None:
         "Binary files a/pkg/image.bin and /dev/null differ\n"
     )
     assert truncate_patch("abcdef", 4) == "abcd\n...<truncated>...\n"
+
+
+def test_format_git_diff_patch_handles_missing_path_and_missing_modified_patch() -> None:
+    assert format_git_diff_patch(path=None, status="modified", patch="@@ -1 +1 @@\n") == (
+        "@@ -1 +1 @@\n"
+    )
+    assert format_git_diff_patch(path="pkg/data.txt", status="modified") is None

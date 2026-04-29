@@ -44,6 +44,21 @@ def test_apply_budget_sets_review_reason_when_only_reviews_are_truncated() -> No
     assert result.truncation.reason == "review list exceeded the evidence budget"
 
 
+def test_apply_budget_sets_commit_reason_when_only_commits_are_truncated() -> None:
+    result = ChangelogResult(
+        package="demo",
+        resolved_versions={"from": "1.0.0", "to": "2.0.0", "range": None},
+        mode="git",
+        commits=[{"sha": "1"}, {"sha": "2"}],
+    )
+
+    apply_budget(result, max_commits=1)
+
+    assert result.truncation.truncated is True
+    assert result.truncation.omitted_commits == 1
+    assert result.truncation.reason == "commit list exceeded the evidence budget"
+
+
 def test_prioritize_files_prefers_metadata_python_and_removed_files() -> None:
     ordered = _prioritize_files(
         [
