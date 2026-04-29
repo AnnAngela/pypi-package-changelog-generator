@@ -267,6 +267,7 @@ def _build_single_sided_patch(
     before_lines: list[str],
     after_lines: list[str],
 ) -> str | None:
+    """Build a unified diff for added or removed text files when body output is needed."""
     if omit_diff_body(path, status):
         return None
     return "".join(
@@ -281,6 +282,7 @@ def _build_single_sided_patch(
 
 
 def _relative_posix_path(path: PurePath, root: PurePath) -> str:
+    """Return a root-relative path with POSIX separators for git-style diff labels."""
     return path.relative_to(root).as_posix()
 
 
