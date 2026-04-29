@@ -6,7 +6,7 @@ Example `~/.openclaw/openclaw.json` snippet:
 {
   "skills": {
     "entries": {
-      "pypi-package-changelog": {
+      "pypi-package-changelog-generator": {
         "enabled": true,
         "apiKey": { "source": "env", "provider": "default", "id": "GITHUB_TOKEN" }
       }
@@ -21,7 +21,7 @@ You can also inject the token directly:
 {
   "skills": {
     "entries": {
-      "pypi-package-changelog": {
+      "pypi-package-changelog-generator": {
         "enabled": true,
         "env": {
           "GITHUB_TOKEN": "ghp_example"

@@ -10,7 +10,7 @@ import packaging
 
 def build_skill_bundle(output_dir: Path) -> Path:
     repo_root = Path(__file__).resolve().parent.parent
-    skill_dir = repo_root / "skills" / "pypi-package-changelog"
+    skill_dir = repo_root / "skills" / "pypi-package-changelog-generator"
     runtime_src_dir = repo_root / "src" / "pypi_package_changelog_generator"
     packaging_dir = Path(packaging.__file__).resolve().parent
 

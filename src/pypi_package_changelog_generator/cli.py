@@ -28,7 +28,7 @@ from pypi_package_changelog_generator.versioning import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pypi-package-changelog",
+        prog="pypi-package-changelog-generator",
         description="Generate structured changelog inputs for PyPI package version diffs.",
     )
     parser.add_argument("--package", required=True, help="PyPI package name.")

@@ -173,6 +173,6 @@ GITHUB_TOKEN=*** {baseDir}/scripts/invoke.py \
 
 ## References
 
-- JSON 输出结构：[output-schema](../pypi-package-changelog-generator/references/output-schema.md)
-- 失败处理说明：[failure-modes](../pypi-package-changelog-generator/references/failure-modes.md)
-- OpenClaw 配置说明：[openclaw-config](../pypi-package-changelog-generator/references/openclaw-config.md)
+- JSON 输出结构：[output-schema](./references/output-schema.md)
+- 失败处理说明：[failure-modes](./references/failure-modes.md)
+- OpenClaw 配置说明：[openclaw-config](./references/openclaw-config.md)

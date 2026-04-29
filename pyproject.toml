@@ -23,7 +23,7 @@ dev = [
 ]
 
 [project.scripts]
-pypi-package-changelog = "pypi_package_changelog_generator.cli:main"
+pypi-package-changelog-generator = "pypi_package_changelog_generator.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -32,4 +32,4 @@ def test_self_contained_skill_bundle_runs_in_isolated_mode(tmp_path: Path) -> No
     )
 
     assert result.returncode == 0, result.stderr
-    assert "pypi-package-changelog" in result.stdout
+    assert "pypi-package-changelog-generator" in result.stdout

@@ -32,7 +32,7 @@
 ├── scripts/
 │   └── build_skill_bundle.py
 ├── skills/
-│   └── pypi-package-changelog/
+│   └── pypi-package-changelog-generator/
 ├── src/
 │   └── pypi_package_changelog_generator/
 └── tests/
@@ -41,7 +41,7 @@
 关键目录说明：
 
 - [src/pypi_package_changelog_generator](src/pypi_package_changelog_generator)：CLI 与分析逻辑实现
-- [skills/pypi-package-changelog](skills/pypi-package-changelog)：OpenClaw Skill 本体
+- [skills/pypi-package-changelog-generator](skills/pypi-package-changelog-generator)：OpenClaw Skill 本体
 - [scripts/build_skill_bundle.py](scripts/build_skill_bundle.py)：构建可发布的 self-contained Skill bundle
 - [.github/workflows/publish-clawhub.yml](.github/workflows/publish-clawhub.yml)：ClawHub 校验与发布流程
 
@@ -115,7 +115,7 @@ python -m pypi_package_changelog_generator.cli \
 ### 方式二：通过 console script 运行
 
 ```bash
-pypi-package-changelog \
+pypi-package-changelog-generator \
   --package requests \
   --version-range 'latest-1'
 ```
@@ -126,7 +126,7 @@ pypi-package-changelog \
 
 ```bash
 export GITHUB_TOKEN=ghp_xxx
-pypi-package-changelog \
+pypi-package-changelog-generator \
   --package httpx \
   --from-version 0.27.0 \
   --to-version 0.28.0
@@ -188,7 +188,7 @@ pytest --override-ini addopts=''
 构建命令：
 
 ```bash
-python scripts/build_skill_bundle.py --output /tmp/pypi-package-changelog-skill
+python scripts/build_skill_bundle.py --output /tmp/pypi-package-changelog-generator
 ```
 
 构建结果会包含：
@@ -204,19 +204,19 @@ python scripts/build_skill_bundle.py --output /tmp/pypi-package-changelog-skill
 可以用隔离模式验证 bundle 是否可独立运行：
 
 ```bash
-python -S /tmp/pypi-package-changelog-skill/scripts/invoke.py --help
+python -S /tmp/pypi-package-changelog-generator/scripts/invoke.py --help
 ```
 
 `-S` 会禁用 site-packages 自动加载，这样可以更早发现“只在本地开发环境能跑、发布后会挂”的问题。
 
 ## OpenClaw / ClawHub
 
-Skill 源目录位于 [skills/pypi-package-changelog](skills/pypi-package-changelog)。
+Skill 源目录位于 [skills/pypi-package-changelog-generator](skills/pypi-package-changelog-generator)。
 
 Skill 的执行入口是：
 
-- [skills/pypi-package-changelog/SKILL.md](skills/pypi-package-changelog/SKILL.md)
-- [skills/pypi-package-changelog/scripts/invoke.py](skills/pypi-package-changelog/scripts/invoke.py)
+- [skills/pypi-package-changelog-generator/SKILL.md](skills/pypi-package-changelog-generator/SKILL.md)
+- [skills/pypi-package-changelog-generator/scripts/invoke.py](skills/pypi-package-changelog-generator/scripts/invoke.py)
 
 包装脚本会优先从发布 bundle 自身加载 `vendor` 和 `src`，因此发布后的 Skill 可以在隔离环境中运行。
 

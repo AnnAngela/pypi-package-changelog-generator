@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bundle_dir="$RUNNER_TEMP/pypi-package-changelog-skill"
+          bundle_dir="$RUNNER_TEMP/pypi-package-changelog-generator"
           python scripts/build_skill_bundle.py --output "$bundle_dir"
           test -f "$bundle_dir/SKILL.md"
           echo "path=$bundle_dir" >> "$GITHUB_OUTPUT"
@@ -109,7 +109,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bundle_dir="$RUNNER_TEMP/pypi-package-changelog-skill"
+          bundle_dir="$RUNNER_TEMP/pypi-package-changelog-generator"
           python scripts/build_skill_bundle.py --output "$bundle_dir"
           echo "path=$bundle_dir" >> "$GITHUB_OUTPUT"
 

@@ -11,7 +11,7 @@ def test_invoke_reads_github_token_from_env_without_putting_it_in_argv(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parent.parent
-    skill_root = repo_root / "skills" / "pypi-package-changelog"
+    skill_root = repo_root / "skills" / "pypi-package-changelog-generator"
     bundle_dir = tmp_path / "bundle"
     scripts_dir = bundle_dir / "scripts"
     package_dir = bundle_dir / "src" / "pypi_package_changelog_generator"
