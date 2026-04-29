@@ -6,7 +6,7 @@ import tarfile
 import tempfile
 from dataclasses import dataclass
 from io import BytesIO
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from pypi_package_changelog_generator.diff_text import format_git_diff_patch, omit_diff_body
@@ -222,31 +222,21 @@ def _create_change(
         )
     elif after and not after["binary"]:
         additions = len(after_lines)
-        raw_patch = None
-        if not omit_diff_body(path, status):
-            raw_patch = "".join(
-                difflib.unified_diff(
-                    [],
-                    after_lines,
-                    fromfile="/dev/null",
-                    tofile=f"b/{path}",
-                    n=3,
-                )
-            )
+        raw_patch = _build_single_sided_patch(
+            path=path,
+            status=status,
+            before_lines=[],
+            after_lines=after_lines,
+        )
         patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
     elif before and not before["binary"]:
         deletions = len(before_lines)
-        raw_patch = None
-        if not omit_diff_body(path, status):
-            raw_patch = "".join(
-                difflib.unified_diff(
-                    before_lines,
-                    [],
-                    fromfile=f"a/{path}",
-                    tofile="/dev/null",
-                    n=3,
-                )
-            )
+        raw_patch = _build_single_sided_patch(
+            path=path,
+            status=status,
+            before_lines=before_lines,
+            after_lines=[],
+        )
         patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
     elif before or after:
         patch = format_git_diff_patch(
@@ -270,7 +260,27 @@ def _decode_lines(content: bytes) -> list[str]:
     return content.decode("utf-8", errors="replace").splitlines(keepends=True)
 
 
-def _relative_posix_path(path: Path, root: Path) -> str:
+def _build_single_sided_patch(
+    *,
+    path: str,
+    status: str,
+    before_lines: list[str],
+    after_lines: list[str],
+) -> str | None:
+    if omit_diff_body(path, status):
+        return None
+    return "".join(
+        difflib.unified_diff(
+            before_lines,
+            after_lines,
+            fromfile="/dev/null" if status == "added" else f"a/{path}",
+            tofile="/dev/null" if status == "removed" else f"b/{path}",
+            n=3,
+        )
+    )
+
+
+def _relative_posix_path(path: PurePath, root: PurePath) -> str:
     return path.relative_to(root).as_posix()
 
 
