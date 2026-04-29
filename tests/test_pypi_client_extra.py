@@ -132,6 +132,18 @@ def test_pypi_client_download_bytes_success_and_errors() -> None:
     finally:
         client.close()
 
+    def status_handler(_: HttpRequest) -> HttpResponse:
+        return _bytes_response(404, b"missing")
+
+    client = PypiClient(transport=status_handler)
+    try:
+        with pytest.raises(PypiClientError) as exc_info:
+            client.download_bytes("https://files.example/demo.tar.gz")
+        assert exc_info.value.code == "pypi_download_failed"
+        assert exc_info.value.retryable is True
+    finally:
+        client.close()
+
 
 def test_pypi_client_wraps_http_errors() -> None:
     def status_handler(_: HttpRequest) -> HttpResponse:
