@@ -101,7 +101,9 @@ def test_build_file_changes_covers_added_removed_modified_binary_and_skipped_fil
     (from_root / "pkg" / "old.txt").write_text("rename me\n", encoding="utf-8")
     (to_root / "pkg" / "new.txt").write_text("rename me\n", encoding="utf-8")
     (to_root / "pkg" / "added.txt").write_text("one\ntwo\n", encoding="utf-8")
+    (to_root / "pkg" / "added.py").write_text("print('new')\n", encoding="utf-8")
     (from_root / "pkg" / "removed.txt").write_text("gone\n", encoding="utf-8")
+    (from_root / "pkg" / "removed.md").write_text("# gone\n", encoding="utf-8")
     (from_root / "pkg" / "unchanged.txt").write_text("same\n", encoding="utf-8")
     (to_root / "pkg" / "unchanged.txt").write_text("same\n", encoding="utf-8")
     (from_root / "pkg" / "image.bin").write_bytes(b"\0before")
@@ -115,10 +117,26 @@ def test_build_file_changes_covers_added_removed_modified_binary_and_skipped_fil
 
     assert by_path["pkg/new.txt"]["status"] == "renamed"
     assert by_path["pkg/added.txt"]["additions"] == 2
+    assert by_path["pkg/added.py"]["additions"] == 1
     assert by_path["pkg/removed.txt"]["deletions"] == 1
+    assert by_path["pkg/removed.md"]["deletions"] == 1
     assert by_path["pkg/same.py"]["status"] == "modified"
-    assert by_path["pkg/same.py"]["patch"].startswith("--- a/pkg/same.py")
-    assert by_path["pkg/image.bin"]["patch"] is None
+    assert by_path["pkg/same.py"]["patch"].startswith(
+        "diff --git a/pkg/same.py b/pkg/same.py"
+    )
+    assert by_path["pkg/added.txt"]["patch"] == (
+        "diff --git a/pkg/added.txt b/pkg/added.txt\nnew file mode 100644\n"
+    )
+    assert by_path["pkg/added.py"]["patch"].startswith(
+        "diff --git a/pkg/added.py b/pkg/added.py\nnew file mode 100644\n--- /dev/null\n"
+    )
+    assert by_path["pkg/removed.md"]["patch"].startswith(
+        "diff --git a/pkg/removed.md b/pkg/removed.md\ndeleted file mode 100644\n--- a/pkg/removed.md\n"
+    )
+    assert by_path["pkg/image.bin"]["patch"] == (
+        "diff --git a/pkg/image.bin b/pkg/image.bin\n"
+        "Binary files a/pkg/image.bin and b/pkg/image.bin differ\n"
+    )
     assert _decode_lines(b"line1\nline2\n") == ["line1\n", "line2\n"]
     assert _should_skip(Path(".git/ignored.txt")) is True
     assert _should_skip(Path("pkg/compiled.pyc")) is True

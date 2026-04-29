@@ -9,6 +9,7 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+from pypi_package_changelog_generator.diff_text import format_git_diff_patch
 from pypi_package_changelog_generator.pypi_client import PypiClient, PypiClientError
 
 
@@ -130,7 +131,11 @@ def build_file_changes(from_root: Path, to_root: Path) -> list[dict[str, Any]]:
                 "additions": 0,
                 "deletions": 0,
                 "changes": 0,
-                "patch": None,
+                "patch": format_git_diff_patch(
+                    path=new_path,
+                    previous_path=old_path,
+                    status="renamed",
+                ),
             }
         )
 
@@ -195,7 +200,7 @@ def _create_change(
     additions = 0
     deletions = 0
     if before and after and not before["binary"] and not after["binary"]:
-        patch = "".join(
+        raw_patch = "".join(
             difflib.unified_diff(
                 before_lines,
                 after_lines,
@@ -204,20 +209,53 @@ def _create_change(
                 n=3,
             )
         )
+        patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
         additions = sum(
             1
-            for line in patch.splitlines()
+            for line in raw_patch.splitlines()
             if line.startswith("+") and not line.startswith("+++")
         )
         deletions = sum(
             1
-            for line in patch.splitlines()
+            for line in raw_patch.splitlines()
             if line.startswith("-") and not line.startswith("---")
         )
     elif after and not after["binary"]:
         additions = len(after_lines)
+        patch = format_git_diff_patch(
+            path=path,
+            status=status,
+            patch="".join(
+                difflib.unified_diff(
+                    [],
+                    after_lines,
+                    fromfile="/dev/null",
+                    tofile=f"b/{path}",
+                    n=3,
+                )
+            ),
+        )
     elif before and not before["binary"]:
         deletions = len(before_lines)
+        patch = format_git_diff_patch(
+            path=path,
+            status=status,
+            patch="".join(
+                difflib.unified_diff(
+                    before_lines,
+                    [],
+                    fromfile=f"a/{path}",
+                    tofile="/dev/null",
+                    n=3,
+                )
+            ),
+        )
+    elif before or after:
+        patch = format_git_diff_patch(
+            path=path,
+            status=status,
+            binary=True,
+        )
 
     return {
         "path": path,
