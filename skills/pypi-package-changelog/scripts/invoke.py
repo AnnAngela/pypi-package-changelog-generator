@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -41,10 +40,7 @@ def main() -> int:
 
     from pypi_package_changelog_generator.cli import main as cli_main
 
-    argv = sys.argv[1:]
-    if "--github-token" not in argv and os.getenv("GITHUB_TOKEN"):
-        argv = [*argv, "--github-token", os.environ["GITHUB_TOKEN"]]
-    return cli_main(argv)
+    return cli_main(sys.argv[1:])
 
 
 if __name__ == "__main__":

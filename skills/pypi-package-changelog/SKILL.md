@@ -20,6 +20,11 @@ user-invocable: true
 
 - GitHub 令牌，可由 OpenClaw 通过 `skills.entries.pypi-package-changelog.apiKey` 或 `skills.entries.pypi-package-changelog.env` 注入为 `GITHUB_TOKEN`。
 
+## 运行环境
+
+- 需要可执行的 `python3`；实际运行版本必须是 Python 3.12 或更高，因为底层分析器仅支持 Python 3.12+。
+- 网络请求会继承标准代理环境变量 `HTTP_PROXY`、`HTTPS_PROXY` 和 `NO_PROXY`；如果运行环境配置了这些变量，本技能会按该网络路径访问 PyPI 和 GitHub。
+
 ## invoke.py 参数定义
 
 `{baseDir}/scripts/invoke.py` 的参数与类型如下。
@@ -98,7 +103,7 @@ GITHUB_TOKEN=*** {baseDir}/scripts/invoke.py \
 - 如果用户给出“包名 + 版本范围”，生成 `--package` 与 `--version-range`。
 - 如果用户给出“包名 + 起始版本 + 目标版本”，生成 `--package`、`--from-version`、`--to-version`。
 - 如果用户只给出包名但没有范围或起止版本，先追问最小缺失输入，不要猜测版本。
-- 如果用户提供了 GitHub 令牌，只通过环境变量 `GITHUB_TOKEN` 注入，不要把令牌作为普通文本参数回显。
+- 如果用户提供了 GitHub 令牌，只通过环境变量 `GITHUB_TOKEN` 注入，不要把令牌作为普通文本参数回显，也不要把它改写成 `--github-token` 命令行参数。
 
 ## GitHub 令牌安全建议
 

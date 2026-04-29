@@ -64,7 +64,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
 
 
 def execute_analysis(args: argparse.Namespace) -> ChangelogResult:
-    token = args.github_token or os.getenv("GITHUB_TOKEN")
+    token = os.getenv("GITHUB_TOKEN")
     result = ChangelogResult(
         package=args.package,
         resolved_versions={"from": None, "to": None, "range": args.version_range},
