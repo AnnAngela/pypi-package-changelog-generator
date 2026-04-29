@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install dependencies
         run: |
@@ -39,8 +39,18 @@ jobs:
       - name: Check CLI help
         run: python -m pypi_package_changelog_generator.cli --help
 
-      - name: Verify skill file exists
-        run: test -f skills/pypi-package-changelog/SKILL.md
+      - name: Build self-contained skill bundle
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="$RUNNER_TEMP/pypi-package-changelog-skill"
+          python scripts/build_skill_bundle.py --output "$bundle_dir"
+          test -f "$bundle_dir/SKILL.md"
+          echo "path=$bundle_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Check self-contained skill help
+        run: python -S "${{ steps.bundle.outputs.path }}/scripts/invoke.py" --help
 
   publish:
     needs:
@@ -52,9 +62,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+
+      - name: Install bundle builder runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install packaging
 
       - name: Resolve version and changelog
         id: release
@@ -85,6 +104,15 @@ jobs:
       - name: Install ClawHub CLI
         run: npm install -g clawhub
 
+      - name: Build self-contained skill bundle
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="$RUNNER_TEMP/pypi-package-changelog-skill"
+          python scripts/build_skill_bundle.py --output "$bundle_dir"
+          echo "path=$bundle_dir" >> "$GITHUB_OUTPUT"
+
       - name: Authenticate ClawHub CLI
         env:
           CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
@@ -95,7 +123,7 @@ jobs:
 
       - name: Publish skill
         run: |
-          clawhub skill publish skills/pypi-package-changelog \
+          clawhub skill publish "${{ steps.bundle.outputs.path }}" \
             --version "${{ steps.release.outputs.version }}" \
             --tags latest \
             --changelog "${{ steps.release.outputs.changelog }}" \

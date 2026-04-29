@@ -7,7 +7,12 @@ import sys
 import pytest
 
 from pypi_package_changelog_generator.archive_diff import ArchiveDiffError
-from pypi_package_changelog_generator.cli import build_parser, execute_analysis, main, validate_args
+from pypi_package_changelog_generator.cli import (
+    build_parser,
+    execute_analysis,
+    main,
+    validate_args,
+)
 from pypi_package_changelog_generator.models import ChangelogResult
 from pypi_package_changelog_generator.providers.base import ProviderError
 from pypi_package_changelog_generator.pypi_client import PypiClientError
@@ -41,7 +46,9 @@ def test_build_parser_and_validate_args_error_paths() -> None:
         )
 
 
-def test_execute_analysis_uses_github_and_cleans_up_archive(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_execute_analysis_uses_github_and_cleans_up_archive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cleanup_called = {"value": False}
     budget_called = {"value": False}
 
@@ -64,7 +71,7 @@ def test_execute_analysis_uses_github_and_cleans_up_archive(monkeypatch: pytest.
             return {"releases": {"1.0.0": [], "2.0.0": []}}
 
         def get_release(self, package: str, version: str) -> dict[str, object]:
-            return {"info": {"license": "MIT", "requires_python": ">=3.12"}}
+            return {"info": {"license": "MIT", "requires_python": ">=3.14"}}
 
         def extract_repository_url(self, *payloads: dict[str, object]) -> str | None:
             return "https://github.com/AnnAngela/demo"
@@ -73,7 +80,9 @@ def test_execute_analysis_uses_github_and_cleans_up_archive(monkeypatch: pytest.
         def __init__(self, token: str | None = None) -> None:
             assert token == "env-token"
 
-        def compare_versions(self, repo_url: str, from_version: str, to_version: str) -> dict[str, object]:
+        def compare_versions(
+            self, repo_url: str, from_version: str, to_version: str
+        ) -> dict[str, object]:
             return {
                 "mode": "git",
                 "source": {
@@ -90,14 +99,25 @@ def test_execute_analysis_uses_github_and_cleans_up_archive(monkeypatch: pytest.
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr("pypi_package_changelog_generator.cli.os.getenv", lambda key: "env-token")
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.cli.os.getenv", lambda key: "env-token"
+    )
     monkeypatch.setattr("pypi_package_changelog_generator.cli.PypiClient", FakeClient)
     monkeypatch.setattr(
         "pypi_package_changelog_generator.cli.resolve_version_pair",
-        lambda releases, **kwargs: type("Selection", (), {"from_version": "1.0.0", "to_version": "2.0.0", "range_expression": None})(),
+        lambda releases, **kwargs: type(
+            "Selection",
+            (),
+            {"from_version": "1.0.0", "to_version": "2.0.0", "range_expression": None},
+        )(),
     )
-    monkeypatch.setattr("pypi_package_changelog_generator.cli.GitHubProvider", FakeProvider)
-    monkeypatch.setattr("pypi_package_changelog_generator.cli.compare_release_archives", lambda client, fr, tr: FakeArchive())
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.cli.GitHubProvider", FakeProvider
+    )
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.cli.compare_release_archives",
+        lambda client, fr, tr: FakeArchive(),
+    )
     monkeypatch.setattr(
         "pypi_package_changelog_generator.cli.analyze_metadata",
         lambda *args, **kwargs: {
@@ -122,7 +142,9 @@ def test_execute_analysis_uses_github_and_cleans_up_archive(monkeypatch: pytest.
     assert budget_called["value"] is True
 
 
-def test_execute_analysis_falls_back_to_archive_and_records_warnings(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_execute_analysis_falls_back_to_archive_and_records_warnings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FakeArchive:
         from_archive = type("Archive", (), {"root": None})()
         to_archive = type("Archive", (), {"root": None})()
@@ -151,7 +173,9 @@ def test_execute_analysis_falls_back_to_archive_and_records_warnings(monkeypatch
         def __init__(self, token: str | None = None) -> None:
             return None
 
-        def compare_versions(self, repo_url: str, from_version: str, to_version: str) -> dict[str, object]:
+        def compare_versions(
+            self, repo_url: str, from_version: str, to_version: str
+        ) -> dict[str, object]:
             raise ProviderError("github_broken", "boom")
 
         def close(self) -> None:
@@ -160,10 +184,19 @@ def test_execute_analysis_falls_back_to_archive_and_records_warnings(monkeypatch
     monkeypatch.setattr("pypi_package_changelog_generator.cli.PypiClient", FakeClient)
     monkeypatch.setattr(
         "pypi_package_changelog_generator.cli.resolve_version_pair",
-        lambda releases, **kwargs: type("Selection", (), {"from_version": "1.0.0", "to_version": "2.0.0", "range_expression": None})(),
+        lambda releases, **kwargs: type(
+            "Selection",
+            (),
+            {"from_version": "1.0.0", "to_version": "2.0.0", "range_expression": None},
+        )(),
     )
-    monkeypatch.setattr("pypi_package_changelog_generator.cli.GitHubProvider", BrokenProvider)
-    monkeypatch.setattr("pypi_package_changelog_generator.cli.compare_release_archives", lambda client, fr, tr: FakeArchive())
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.cli.GitHubProvider", BrokenProvider
+    )
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.cli.compare_release_archives",
+        lambda client, fr, tr: FakeArchive(),
+    )
     monkeypatch.setattr(
         "pypi_package_changelog_generator.cli.analyze_metadata",
         lambda *args, **kwargs: {
@@ -172,7 +205,9 @@ def test_execute_analysis_falls_back_to_archive_and_records_warnings(monkeypatch
             "breaking_signals": [],
         },
     )
-    monkeypatch.setattr("pypi_package_changelog_generator.cli.apply_budget", lambda result: None)
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.cli.apply_budget", lambda result: None
+    )
 
     result = execute_analysis(_Args())
 
@@ -182,7 +217,9 @@ def test_execute_analysis_falls_back_to_archive_and_records_warnings(monkeypatch
     assert result.warnings[0].code == "github_broken"
 
 
-def test_execute_analysis_reports_repository_missing_and_unavailable_analysis(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_execute_analysis_reports_repository_missing_and_unavailable_analysis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FakeClient:
         def __enter__(self) -> "FakeClient":
             return self
@@ -202,11 +239,21 @@ def test_execute_analysis_reports_repository_missing_and_unavailable_analysis(mo
     monkeypatch.setattr("pypi_package_changelog_generator.cli.PypiClient", FakeClient)
     monkeypatch.setattr(
         "pypi_package_changelog_generator.cli.resolve_version_pair",
-        lambda releases, **kwargs: type("Selection", (), {"from_version": "1.0.0", "to_version": "2.0.0", "range_expression": "latest-1"})(),
+        lambda releases, **kwargs: type(
+            "Selection",
+            (),
+            {
+                "from_version": "1.0.0",
+                "to_version": "2.0.0",
+                "range_expression": "latest-1",
+            },
+        )(),
     )
     monkeypatch.setattr(
         "pypi_package_changelog_generator.cli.compare_release_archives",
-        lambda client, fr, tr: (_ for _ in ()).throw(ArchiveDiffError("sdist_missing", "missing")),
+        lambda client, fr, tr: (_ for _ in ()).throw(
+            ArchiveDiffError("sdist_missing", "missing")
+        ),
     )
     monkeypatch.setattr(
         "pypi_package_changelog_generator.cli.analyze_metadata",
@@ -216,12 +263,17 @@ def test_execute_analysis_reports_repository_missing_and_unavailable_analysis(mo
             "breaking_signals": [],
         },
     )
-    monkeypatch.setattr("pypi_package_changelog_generator.cli.apply_budget", lambda result: None)
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.cli.apply_budget", lambda result: None
+    )
 
     result = execute_analysis(_Args())
 
     assert result.mode == "error"
-    assert [warning.code for warning in result.warnings] == ["repository_missing", "sdist_missing"]
+    assert [warning.code for warning in result.warnings] == [
+        "repository_missing",
+        "sdist_missing",
+    ]
     assert result.errors[0].code == "analysis_unavailable"
 
 
@@ -267,10 +319,15 @@ def test_main_returns_zero_on_broken_pipe(monkeypatch: pytest.MonkeyPatch) -> No
         lambda *args, **kwargs: (_ for _ in ()).throw(BrokenPipeError()),
     )
 
-    assert main(["--package", "demo", "--from-version", "1.0.0", "--to-version", "2.0.0"]) == 0
+    assert (
+        main(["--package", "demo", "--from-version", "1.0.0", "--to-version", "2.0.0"])
+        == 0
+    )
 
 
-def test_module_main_entrypoint_raises_system_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_module_main_entrypoint_raises_system_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "argparse.ArgumentParser.parse_args",
         lambda self, argv=None: argparse.Namespace(
@@ -293,12 +350,16 @@ def test_module_main_entrypoint_raises_system_exit(monkeypatch: pytest.MonkeyPat
         def get_project(self, package: str) -> dict[str, object]:
             raise PypiClientError("pypi_http_error", "failed")
 
-    monkeypatch.setattr("pypi_package_changelog_generator.pypi_client.PypiClient", FakeClient)
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.pypi_client.PypiClient", FakeClient
+    )
     existing = sys.modules.pop("pypi_package_changelog_generator.cli", None)
 
     try:
         with pytest.raises(SystemExit) as exc_info:
-            runpy.run_module("pypi_package_changelog_generator.cli", run_name="__main__")
+            runpy.run_module(
+                "pypi_package_changelog_generator.cli", run_name="__main__"
+            )
     finally:
         if existing is not None:
             sys.modules["pypi_package_changelog_generator.cli"] = existing

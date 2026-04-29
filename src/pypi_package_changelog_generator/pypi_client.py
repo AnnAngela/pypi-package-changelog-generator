@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
-import httpx
+from pypi_package_changelog_generator._http import (
+    HttpClient,
+    HttpTransport,
+    HttpTransportError,
+)
 
 
 class PypiClientError(RuntimeError):
@@ -16,11 +20,10 @@ class PypiClientError(RuntimeError):
 
 class PypiClient:
     def __init__(
-        self, *, timeout: float = 30.0, transport: httpx.BaseTransport | None = None
+        self, *, timeout: float = 30.0, transport: HttpTransport | None = None
     ) -> None:
-        self._client = httpx.Client(
+        self._client = HttpClient(
             base_url="https://pypi.org/pypi",
-            follow_redirects=True,
             headers={"Accept": "application/json"},
             timeout=timeout,
             transport=transport,
@@ -45,13 +48,18 @@ class PypiClient:
     def download_bytes(self, url: str) -> bytes:
         try:
             response = self._client.get(url)
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
+        except HttpTransportError as exc:
             raise PypiClientError(
                 code="pypi_download_failed",
                 message=f"Failed to download source archive from {url}.",
                 retryable=True,
             ) from exc
+        if response.status_code >= 400:
+            raise PypiClientError(
+                code="pypi_download_failed",
+                message=f"Failed to download source archive from {url}.",
+                retryable=True,
+            )
         return response.content
 
     def find_sdist_url(self, release_payload: dict[str, Any]) -> str | None:
@@ -79,20 +87,20 @@ class PypiClient:
     def _get_json(self, path: str) -> dict[str, Any]:
         try:
             response = self._client.get(path)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            status = exc.response.status_code
-            raise PypiClientError(
-                code=f"pypi_http_{status}",
-                message=f"PyPI request failed for {path} with HTTP {status}.",
-                retryable=status >= 500,
-            ) from exc
-        except httpx.HTTPError as exc:
+        except HttpTransportError as exc:
             raise PypiClientError(
                 code="pypi_http_error",
                 message=f"PyPI request failed for {path}.",
                 retryable=True,
             ) from exc
+
+        if response.status_code >= 400:
+            status = response.status_code
+            raise PypiClientError(
+                code=f"pypi_http_{status}",
+                message=f"PyPI request failed for {path} with HTTP {status}.",
+                retryable=status >= 500,
+            )
         return response.json()
 
 

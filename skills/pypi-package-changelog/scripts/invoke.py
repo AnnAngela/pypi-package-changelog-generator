@@ -6,15 +6,38 @@ import sys
 from pathlib import Path
 
 
+def _prepend_import_path_if_present(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    text = str(path)
+    if text not in sys.path:
+        sys.path.insert(0, text)
+    return True
+
+
+def _configure_import_paths() -> None:
+    script_path = Path(__file__).resolve()
+    checked: set[Path] = set()
+    for root in (script_path.parent, *script_path.parents):
+        if root in checked:
+            continue
+        checked.add(root)
+
+        vendor_dir = root / "vendor"
+        src_dir = root / "src"
+        package_dir = src_dir / "pypi_package_changelog_generator"
+        if package_dir.is_dir():
+            _prepend_import_path_if_present(vendor_dir)
+            _prepend_import_path_if_present(src_dir)
+            return
+
+
 def main() -> int:
-    if sys.version_info < (3, 12):
-        print("Python 3.12 or newer is required.", file=sys.stderr)
+    if sys.version_info < (3, 14):
+        print("Python 3.14 or newer is required.", file=sys.stderr)
         return 2
 
-    repo_root = Path(__file__).resolve().parents[3]
-    src_dir = repo_root / "src"
-    if str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
+    _configure_import_paths()
 
     from pypi_package_changelog_generator.cli import main as cli_main
 

@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from collections import deque
 
-import httpx
 import pytest
 
-from pypi_package_changelog_generator.providers.base import ProviderError, RepositoryProvider
+from pypi_package_changelog_generator._http import (
+    HttpRequest,
+    HttpResponse,
+    HttpTransportError,
+)
+from pypi_package_changelog_generator.providers.base import (
+    ProviderError,
+    RepositoryProvider,
+)
 from pypi_package_changelog_generator.providers.github import (
     GitHubProvider,
     _extract_error_message,
@@ -16,8 +23,32 @@ from pypi_package_changelog_generator.providers.github import (
 )
 
 
-def _json_response(status: int, payload: object, headers: dict[str, str] | None = None) -> httpx.Response:
-    return httpx.Response(status, headers=headers, json=payload)
+def _json_response(
+    status: int,
+    payload: object,
+    headers: dict[str, str] | None = None,
+    url: str = "https://api.github.com/test",
+) -> HttpResponse:
+    return HttpResponse(
+        status_code=status,
+        headers={key.lower(): value for key, value in (headers or {}).items()},
+        content=(__import__("json").dumps(payload)).encode("utf-8"),
+        url=url,
+    )
+
+
+def _raw_response(
+    status: int,
+    payload: bytes,
+    headers: dict[str, str] | None = None,
+    url: str = "https://api.github.com/test",
+) -> HttpResponse:
+    return HttpResponse(
+        status_code=status,
+        headers={key.lower(): value for key, value in (headers or {}).items()},
+        content=payload,
+        url=url,
+    )
 
 
 def test_provider_base_types_raise_expected_errors() -> None:
@@ -57,7 +88,10 @@ def test_compare_versions_collects_commits_reviews_and_warning() -> None:
                             "html_url": "https://github.com/AnnAngela/demo/commit/abc",
                             "commit": {
                                 "message": "Subject line\n\nbody",
-                                "author": {"name": "Ann", "date": "2024-01-01T00:00:00Z"},
+                                "author": {
+                                    "name": "Ann",
+                                    "date": "2024-01-01T00:00:00Z",
+                                },
                             },
                         }
                     ],
@@ -81,11 +115,11 @@ def test_compare_versions_collects_commits_reviews_and_warning() -> None:
         ],
     }
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        queue = responses[request.url.path]
+    def handler(request: HttpRequest) -> HttpResponse:
+        queue = responses[request.path]
         return queue.pop(0)
 
-    provider = GitHubProvider(token="secret", transport=httpx.MockTransport(handler))
+    provider = GitHubProvider(token="secret", transport=handler)
     try:
         result = provider.compare_versions(
             "https://github.com/AnnAngela/demo", "1.0.0", "2.0.0"
@@ -103,23 +137,39 @@ def test_compare_versions_collects_commits_reviews_and_warning() -> None:
 
 def test_compare_versions_raises_when_tag_cannot_be_matched() -> None:
     provider = GitHubProvider(
-        transport=httpx.MockTransport(lambda _: _json_response(200, [{"name": "v1.0.0"}]))
+        transport=lambda _: _json_response(200, [{"name": "v1.0.0"}])
     )
     try:
         with pytest.raises(ProviderError, match="Could not match a GitHub tag"):
-            provider.compare_versions("https://github.com/AnnAngela/demo", "1.0.0", "2.0.0")
+            provider.compare_versions(
+                "https://github.com/AnnAngela/demo", "1.0.0", "2.0.0"
+            )
     finally:
         provider.close()
 
 
-def test_collect_pull_requests_skips_missing_shas_provider_errors_and_duplicates() -> None:
+def test_collect_pull_requests_skips_missing_shas_provider_errors_and_duplicates() -> (
+    None
+):
     provider = GitHubProvider()
     responses = iter(
         [
             ProviderError("boom", "broken"),
             [
-                {"number": 1, "title": "One", "html_url": "u1", "state": "open", "merged_at": None},
-                {"number": 1, "title": "Duplicate", "html_url": "u1", "state": "open", "merged_at": None},
+                {
+                    "number": 1,
+                    "title": "One",
+                    "html_url": "u1",
+                    "state": "open",
+                    "merged_at": None,
+                },
+                {
+                    "number": 1,
+                    "title": "Duplicate",
+                    "html_url": "u1",
+                    "state": "open",
+                    "merged_at": None,
+                },
             ],
         ]
     )
@@ -140,7 +190,9 @@ def test_collect_pull_requests_skips_missing_shas_provider_errors_and_duplicates
     finally:
         provider.close()
 
-    assert pulls == [{"number": 1, "title": "One", "url": "u1", "state": "open", "merged_at": None}]
+    assert pulls == [
+        {"number": 1, "title": "One", "url": "u1", "state": "open", "merged_at": None}
+    ]
 
 
 def test_fetch_tags_paginates_until_short_page() -> None:
@@ -169,26 +221,30 @@ def test_fetch_tags_stops_on_empty_payload() -> None:
         provider.close()
 
 
-def test_get_json_retries_http_errors_and_wraps_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("pypi_package_changelog_generator.providers.github.time.sleep", lambda _: None)
+def test_get_json_retries_http_errors_and_wraps_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.providers.github.time.sleep", lambda _: None
+    )
     attempts = {"count": 0}
 
-    def flaky_handler(_: httpx.Request) -> httpx.Response:
+    def flaky_handler(_: HttpRequest) -> HttpResponse:
         attempts["count"] += 1
         if attempts["count"] == 1:
-            raise httpx.ReadError("temporary")
+            raise HttpTransportError("temporary")
         return _json_response(200, {"ok": True})
 
-    provider = GitHubProvider(max_retries=1, transport=httpx.MockTransport(flaky_handler))
+    provider = GitHubProvider(max_retries=1, transport=flaky_handler)
     try:
         assert provider._get_json("/demo") == {"ok": True}
     finally:
         provider.close()
 
-    def always_fail(_: httpx.Request) -> httpx.Response:
-        raise httpx.ReadError("broken")
+    def always_fail(_: HttpRequest) -> HttpResponse:
+        raise HttpTransportError("broken")
 
-    provider = GitHubProvider(max_retries=0, transport=httpx.MockTransport(always_fail))
+    provider = GitHubProvider(max_retries=0, transport=always_fail)
     try:
         with pytest.raises(ProviderError) as exc_info:
             provider._get_json("/demo")
@@ -198,8 +254,12 @@ def test_get_json_retries_http_errors_and_wraps_failures(monkeypatch: pytest.Mon
         provider.close()
 
 
-def test_get_json_handles_retryable_and_final_http_statuses(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("pypi_package_changelog_generator.providers.github.time.sleep", lambda _: None)
+def test_get_json_handles_retryable_and_final_http_statuses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.providers.github.time.sleep", lambda _: None
+    )
     queued = deque(
         [
             _json_response(503, {"message": "retry me"}),
@@ -207,7 +267,7 @@ def test_get_json_handles_retryable_and_final_http_statuses(monkeypatch: pytest.
         ]
     )
 
-    provider = GitHubProvider(max_retries=1, transport=httpx.MockTransport(lambda _: queued.popleft()))
+    provider = GitHubProvider(max_retries=1, transport=lambda _: queued.popleft())
     try:
         assert provider._get_json("/demo") == {"ok": True}
     finally:
@@ -223,12 +283,10 @@ def test_get_json_handles_retryable_and_final_http_statuses(monkeypatch: pytest.
 
     provider = GitHubProvider(
         max_retries=0,
-        transport=httpx.MockTransport(
-            lambda _: _json_response(
-                403,
-                {"message": "API rate limit exceeded"},
-                headers={"x-ratelimit-remaining": "0"},
-            )
+        transport=lambda _: _json_response(
+            403,
+            {"message": "API rate limit exceeded"},
+            headers={"x-ratelimit-remaining": "0"},
         ),
     )
     try:
@@ -241,7 +299,7 @@ def test_get_json_handles_retryable_and_final_http_statuses(monkeypatch: pytest.
 
     provider = GitHubProvider(
         max_retries=0,
-        transport=httpx.MockTransport(lambda _: _json_response(404, {"message": "missing"})),
+        transport=lambda _: _json_response(404, {"message": "missing"}),
     )
     try:
         with pytest.raises(ProviderError) as exc_info:
@@ -275,25 +333,41 @@ def test_resolve_tag_name_and_rate_limit_helpers() -> None:
     assert resolve_tag_name(["V1.0.0"], "1.0.0") == "V1.0.0"
     assert resolve_tag_name(["tag-1"], "1.0.0") is None
 
-    response = httpx.Response(403, headers={"retry-after": "1"}, request=httpx.Request("GET", "https://api.github.com"))
+    response = _raw_response(403, b"{}", headers={"retry-after": "1"})
     assert is_rate_limited(response) is True
-    response = httpx.Response(403, headers={"x-ratelimit-remaining": "0"}, request=httpx.Request("GET", "https://api.github.com"))
+    response = _raw_response(403, b"{}", headers={"x-ratelimit-remaining": "0"})
     assert is_rate_limited(response) is True
-    response = httpx.Response(403, content=b"not-json", request=httpx.Request("GET", "https://api.github.com"))
+    response = _raw_response(403, b"not-json")
     assert is_rate_limited(response) is False
-    response = httpx.Response(403, json={"message": "secondary rate limit"}, request=httpx.Request("GET", "https://api.github.com"))
+    response = _json_response(403, {"message": "secondary rate limit"})
     assert is_rate_limited(response) is True
 
 
 def test_retry_delay_and_error_message_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("pypi_package_changelog_generator.providers.github.time.time", lambda: 10.0)
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.providers.github.time.time", lambda: 10.0
+    )
     assert compute_retry_delay({"retry-after": "bad"}, 0) is None
-    assert compute_retry_delay({"x-ratelimit-remaining": "0", "x-ratelimit-reset": "bad"}, 0) is None
-    assert compute_retry_delay({"x-ratelimit-remaining": "0", "x-ratelimit-reset": "12"}, 0) == 3.0
+    assert (
+        compute_retry_delay(
+            {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "bad"}, 0
+        )
+        is None
+    )
+    assert (
+        compute_retry_delay(
+            {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "12"}, 0
+        )
+        == 3.0
+    )
     assert compute_retry_delay({}, 2) == 240.0
 
-    json_response = httpx.Response(500, json={}, request=httpx.Request("GET", "https://api.github.com"))
-    assert _extract_error_message(json_response) == "GitHub request failed with HTTP 500."
+    json_response = _json_response(500, {})
+    assert (
+        _extract_error_message(json_response) == "GitHub request failed with HTTP 500."
+    )
 
-    raw_response = httpx.Response(500, content=b"not-json", request=httpx.Request("GET", "https://api.github.com"))
-    assert _extract_error_message(raw_response) == "GitHub request failed with HTTP 500."
+    raw_response = _raw_response(500, b"not-json")
+    assert (
+        _extract_error_message(raw_response) == "GitHub request failed with HTTP 500."
+    )

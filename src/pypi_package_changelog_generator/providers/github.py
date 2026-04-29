@@ -4,7 +4,12 @@ import time
 from typing import Any
 from urllib.parse import quote, urlparse
 
-import httpx
+from pypi_package_changelog_generator._http import (
+    HttpClient,
+    HttpResponse,
+    HttpTransport,
+    HttpTransportError,
+)
 
 from pypi_package_changelog_generator.models import WarningInfo
 from pypi_package_changelog_generator.providers.base import (
@@ -21,7 +26,7 @@ class GitHubProvider(RepositoryProvider):
         token: str | None = None,
         timeout: float = 30.0,
         max_retries: int = 3,
-        transport: httpx.BaseTransport | None = None,
+        transport: HttpTransport | None = None,
     ) -> None:
         headers = {
             "Accept": "application/vnd.github+json",
@@ -29,9 +34,8 @@ class GitHubProvider(RepositoryProvider):
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        self._client = httpx.Client(
+        self._client = HttpClient(
             base_url="https://api.github.com",
-            follow_redirects=True,
             headers=headers,
             timeout=timeout,
             transport=transport,
@@ -152,7 +156,7 @@ class GitHubProvider(RepositoryProvider):
         for attempt in range(self._max_retries + 1):
             try:
                 response = self._client.get(path, params=params)
-            except httpx.HTTPError as exc:
+            except HttpTransportError as exc:
                 if attempt >= self._max_retries:
                     raise ProviderError(
                         code="github_http_error",
@@ -215,7 +219,7 @@ def resolve_tag_name(tags: list[str], version: str) -> str | None:
     return None
 
 
-def is_rate_limited(response: httpx.Response) -> bool:
+def is_rate_limited(response: HttpResponse) -> bool:
     if response.headers.get("retry-after"):
         return True
     if response.headers.get("x-ratelimit-remaining") == "0":
@@ -228,7 +232,7 @@ def is_rate_limited(response: httpx.Response) -> bool:
 
 
 def compute_retry_delay(
-    headers: httpx.Headers | dict[str, str], attempt: int, now: float | None = None
+    headers: dict[str, str], attempt: int, now: float | None = None
 ) -> float | None:
     retry_after = headers.get("retry-after")
     if retry_after:
@@ -249,7 +253,7 @@ def compute_retry_delay(
     return float(60 * (2**attempt))
 
 
-def _extract_error_message(response: httpx.Response) -> str:
+def _extract_error_message(response: HttpResponse) -> str:
     try:
         payload = response.json()
     except ValueError:
