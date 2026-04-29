@@ -3,7 +3,7 @@ from __future__ import annotations
 import tarfile
 import tempfile
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -13,6 +13,7 @@ from pypi_package_changelog_generator.archive_diff import (
     ExtractedArchive,
     _decode_lines,
     _is_safe_tar_member,
+    _relative_posix_path,
     _should_skip,
     build_file_changes,
     compare_release_archives,
@@ -171,3 +172,41 @@ def test_archive_cleanup_helpers_remove_temporary_directories() -> None:
 
     assert not Path(temp_a.name).exists()
     assert not Path(temp_b.name).exists()
+
+
+def test_relative_posix_path_normalizes_windows_separators() -> None:
+    path = PureWindowsPath(r"C:\repo\pkg\module.py")
+    root = PureWindowsPath(r"C:\repo")
+
+    assert _relative_posix_path(path, root) == "pkg/module.py"
+
+
+def test_build_file_changes_skips_diff_generation_for_non_python_added_removed_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from_root = tmp_path / "from"
+    to_root = tmp_path / "to"
+    from_root.mkdir()
+    to_root.mkdir()
+    (from_root / "pkg").mkdir()
+    (to_root / "pkg").mkdir()
+    (from_root / "pkg" / "removed.txt").write_text("gone\n", encoding="utf-8")
+    (to_root / "pkg" / "added.txt").write_text("new\n", encoding="utf-8")
+
+    def fail_unified_diff(*args: object, **kwargs: object) -> object:
+        raise AssertionError("unified_diff should not be called")
+
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.archive_diff.difflib.unified_diff",
+        fail_unified_diff,
+    )
+
+    changes = build_file_changes(from_root, to_root)
+    by_path = {change["path"]: change for change in changes}
+
+    assert by_path["pkg/added.txt"]["patch"] == (
+        "diff --git a/pkg/added.txt b/pkg/added.txt\nnew file mode 100644\n"
+    )
+    assert by_path["pkg/removed.txt"]["patch"] == (
+        "diff --git a/pkg/removed.txt b/pkg/removed.txt\ndeleted file mode 100644\n"
+    )

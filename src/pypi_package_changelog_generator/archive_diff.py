@@ -9,7 +9,7 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-from pypi_package_changelog_generator.diff_text import format_git_diff_patch
+from pypi_package_changelog_generator.diff_text import format_git_diff_patch, omit_diff_body
 from pypi_package_changelog_generator.pypi_client import PypiClient, PypiClientError
 
 
@@ -158,7 +158,7 @@ def _collect_files(root: Path) -> dict[str, dict[str, Any]]:
         if not path.is_file() or _should_skip(path.relative_to(root)):
             continue
         content = path.read_bytes()
-        files[str(path.relative_to(root))] = {
+        files[_relative_posix_path(path, root)] = {
             "hash": hashlib.sha1(content).hexdigest(),
             "size": len(content),
             "binary": b"\0" in content[:4096],
@@ -222,10 +222,9 @@ def _create_change(
         )
     elif after and not after["binary"]:
         additions = len(after_lines)
-        patch = format_git_diff_patch(
-            path=path,
-            status=status,
-            patch="".join(
+        raw_patch = None
+        if not omit_diff_body(path, status):
+            raw_patch = "".join(
                 difflib.unified_diff(
                     [],
                     after_lines,
@@ -233,14 +232,13 @@ def _create_change(
                     tofile=f"b/{path}",
                     n=3,
                 )
-            ),
-        )
+            )
+        patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
     elif before and not before["binary"]:
         deletions = len(before_lines)
-        patch = format_git_diff_patch(
-            path=path,
-            status=status,
-            patch="".join(
+        raw_patch = None
+        if not omit_diff_body(path, status):
+            raw_patch = "".join(
                 difflib.unified_diff(
                     before_lines,
                     [],
@@ -248,8 +246,8 @@ def _create_change(
                     tofile="/dev/null",
                     n=3,
                 )
-            ),
-        )
+            )
+        patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
     elif before or after:
         patch = format_git_diff_patch(
             path=path,
@@ -270,6 +268,10 @@ def _create_change(
 
 def _decode_lines(content: bytes) -> list[str]:
     return content.decode("utf-8", errors="replace").splitlines(keepends=True)
+
+
+def _relative_posix_path(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix()
 
 
 def _should_skip(path: Path) -> bool:
