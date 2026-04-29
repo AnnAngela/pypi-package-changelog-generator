@@ -7,7 +7,7 @@ name = "pypi-package-changelog-generator"
 version = "0.1.0"
 description = "Generate structured changelog inputs for PyPI package version diffs."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
   { name = "AnnAngela" }

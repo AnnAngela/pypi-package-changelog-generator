@@ -33,8 +33,8 @@ def _configure_import_paths() -> None:
 
 
 def main() -> int:
-    if sys.version_info < (3, 14):
-        print("Python 3.14 or newer is required.", file=sys.stderr)
+    if sys.version_info < (3, 12):
+        print("Python 3.12 or newer is required.", file=sys.stderr)
         return 2
 
     _configure_import_paths()

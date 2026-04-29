@@ -47,88 +47,19 @@
 
 ## 环境要求
 
-- Python 3.14+
+- Python 3.12+
 - Linux、macOS 或 Windows（CLI 本身为纯 Python）
 - 如果要发布 Skill：
   - Node.js 24+
   - `clawhub` CLI
   - 有效的 `CLAWHUB_TOKEN`
 
-## Ubuntu 24.04 使用 pyenv 安装 Python 3.14
-
-Ubuntu 24.04 的系统 `python3` 默认指向 3.12，因此如果本机没有现成的 `python3.14`，推荐使用 `pyenv` 安装一个独立的 3.14 解释器，而不要替换系统 `/usr/bin/python3`。
-
-### 0. 安装编译依赖
-
-```bash
-sudo apt update
-sudo apt install make build-essential libssl-dev zlib1g-dev \
-  libbz2-dev libreadline-dev libsqlite3-dev curl git \
-  libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-```
-
-### 1. 安装 pyenv
-
-```bash
-curl -fsSL https://pyenv.run | bash
-```
-
-### 2. 配置 pyenv
-
-```bash
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
-if [[ -s ~/.profile ]]; then
-  echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.profile
-  echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.profile
-  echo 'eval "$(pyenv init - bash)"' >> ~/.profile
-fi
-if [[ -s ~/.bash_profile ]]; then
-  echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bash_profile
-  echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bash_profile
-  echo 'eval "$(pyenv init - bash)"' >> ~/.bash_profile
-fi
-source ~/.bashrc
-```
-
-如果你使用的是 zsh，请把上面的 `~/.bashrc` 改成 `~/.zshrc`。
-
-### 3. 安装 Python 3.14 并绑定到当前仓库
-
-```bash
-pyenv install 3.14.4
-cd /data/pypi-package-changelog-generator
-pyenv local 3.14.4
-python -V
-```
-
-执行完后，仓库根目录会生成 `.python-version`，此目录下的 `python` 将优先指向 `pyenv` 管理的 3.14.4。
-
 ## 创建 venv
 
 推荐在仓库根目录使用本地虚拟环境：
 
-如果仓库里已经有旧的 `.venv`，尤其是它曾经由 Python 3.12 创建过，请先停用并删除或备份旧目录，再重新创建。不要直接在一个旧 `.venv` 上原地覆盖创建新的虚拟环境。
-
 ```bash
-deactivate 2>/dev/null || true
-mv .venv ".venv.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
-```
-
-如果你已经按上文使用 `pyenv local 3.14.4`，直接运行下面这组命令即可：
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[dev]'
-```
-
-如果你本机已经有系统级 `python3.14`，也可以继续使用显式解释器：
-
-```bash
-python3.14 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e '.[dev]'
@@ -158,52 +89,15 @@ python -m pip install -e '.[dev]' --upgrade
 
 适合 Python 版本变更、依赖冲突或你想得到一个干净环境的情况：
 
-如果你使用 pyenv：
-
-```bash
-cd /data/pypi-package-changelog-generator
-pyenv local 3.14.4
-rm -rf .venv
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[dev]'
-```
-
-如果你使用系统级 `python3.14`：
-
 ```bash
 rm -rf .venv
-python3.14 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e '.[dev]'
 ```
 
 如果你切换了 Python 次版本，优先使用重建方式。
-
-### 常见报错：`ensurepip` 非零退出
-
-如果执行 `python -m venv .venv` 时看到类似下面的报错：
-
-```text
-Error: Command '[.../.venv/bin/python', '-m', 'ensurepip', '--upgrade', '--default-pip']' returned non-zero exit status 1.
-```
-
-通常说明当前 `.venv` 里混入了旧版本 Python 的残留文件，例如 `.venv/bin/python` 仍然指向旧的 3.12 解释器。
-
-修复方式：
-
-```bash
-cd /data/pypi-package-changelog-generator
-deactivate 2>/dev/null || true
-pyenv local 3.14.4
-python -V
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[dev]'
-```
 
 ## 本地运行 CLI
 
