@@ -20,11 +20,104 @@ user-invocable: true
 
 - GitHub 令牌，可由 OpenClaw 通过 `skills.entries.pypi-package-changelog.apiKey` 或 `skills.entries.pypi-package-changelog.env` 注入为 `GITHUB_TOKEN`。
 
+## invoke.py 参数定义
+
+`{baseDir}/scripts/invoke.py` 的参数与类型如下。
+
+### 必填参数
+
+- `--package <string>`
+   - 类型：字符串
+   - 含义：PyPI 包名，例如 `requests`、`httpx`、`numpy`
+   - 规则：每次调用都必须提供
+
+### 版本选择参数
+
+- `--from-version <string>`
+   - 类型：字符串
+   - 含义：显式指定起始版本
+   - 规则：必须与 `--to-version` 一起提供；不能与 `--version-range` 同时出现
+
+- `--to-version <string>`
+   - 类型：字符串
+   - 含义：显式指定目标版本
+   - 规则：必须与 `--from-version` 一起提供；不能与 `--version-range` 同时出现
+
+- `--version-range <string>`
+   - 类型：字符串
+   - 含义：版本范围表达式
+   - 支持示例：`>=1.0,<2.0`、`latest-1`
+   - 规则：与 `--from-version` / `--to-version` 二选一，不能混用
+
+### 可选参数
+
+- `--json-indent <integer>`
+   - 类型：整数
+   - 含义：JSON 输出缩进
+   - 默认值：`2`
+   - 建议：OpenClaw 正常使用时通常不需要显式传入，除非你明确需要修改输出格式
+
+## invoke.py 调用约束
+
+- 必须始终提供 `--package`。
+- 版本参数只能使用以下两种模式之一：
+   - 模式 A：`--package` + `--version-range`
+   - 模式 B：`--package` + `--from-version` + `--to-version`
+- 不要同时生成 `--version-range` 和 `--from-version` / `--to-version`。
+- 如果用户没有明确提供 GitHub 令牌，不要主动要求令牌；无令牌也可以运行，只是 GitHub compare 证据可能较弱或更容易受限流影响。
+
+## invoke.py 示例
+
+### 示例 1：使用版本范围
+
+```bash
+{baseDir}/scripts/invoke.py \
+   --package requests \
+   --version-range 'latest-1'
+```
+
+### 示例 2：使用显式版本对
+
+```bash
+{baseDir}/scripts/invoke.py \
+   --package httpx \
+   --from-version 0.27.0 \
+   --to-version 0.28.0
+```
+
+### 示例 3：带环境变量注入的 GitHub 令牌
+
+```bash
+GITHUB_TOKEN=*** {baseDir}/scripts/invoke.py \
+   --package numpy \
+   --version-range '>=1.26,<2.0'
+```
+
+## OpenClaw 参数提取建议
+
+- 如果用户给出“包名 + 版本范围”，生成 `--package` 与 `--version-range`。
+- 如果用户给出“包名 + 起始版本 + 目标版本”，生成 `--package`、`--from-version`、`--to-version`。
+- 如果用户只给出包名但没有范围或起止版本，先追问最小缺失输入，不要猜测版本。
+- 如果用户提供了 GitHub 令牌，只通过环境变量 `GITHUB_TOKEN` 注入，不要把令牌作为普通文本参数回显。
+
+## GitHub 令牌安全建议
+
+- GitHub 令牌是可选项；仅在需要提高 GitHub API 稳定性或速率限制余量时使用。
+- 优先使用短期、可轮换、最小权限的令牌；如果令牌类型要求显式授权，只授予读取公开仓库元数据与比较结果所必需的最小只读权限。
+- 不要为这个技能提供带写权限的高权限令牌，例如可写仓库内容、Actions、Secrets、Webhooks、Packages、组织管理或管理员权限。
+- 这个技能不需要私有仓库访问；除非你明确接受额外风险，否则不要授予私有仓库、组织范围或全账户范围访问。
+- 只通过 `GITHUB_TOKEN` 环境变量注入令牌，不要要求用户把令牌直接粘贴进聊天消息、Markdown、issue、PR、日志、配置截图或普通文本参数里。
+- 不要在命令行展示、聊天响应、错误信息、调试输出、结构化 JSON 结果或任何回显内容中暴露令牌；如果上游错误意外包含令牌，必须先脱敏再返回。
+- 不要把令牌写入仓库文件、临时说明文档、测试夹具、shell 历史示例、持久化缓存或发布产物。
+- 不要把令牌传递给与 GitHub API 无关的外部站点、第三方服务或额外子进程；令牌只应用于本技能调用 GitHub API 的这一步。
+- 如果运行环境支持作用域隔离，应仅对当前技能执行注入该环境变量，并在执行结束后避免继续复用同一高敏感环境。
+- 如果怀疑令牌已泄露、被误回显、被写入日志或被错误分享，应立即停止继续使用该令牌，并建议用户撤销、轮换并重新生成新的最小权限令牌。
+
 ## 执行步骤
 
 1. 确认包名和版本范围。
 2. 运行 `{baseDir}/scripts/invoke.py`，传入 `--package`，以及 `--version-range` 或同时传入 `--from-version` 和 `--to-version`。
-3. 如果用户提供了 GitHub 令牌，让包装脚本从 `GITHUB_TOKEN` 读取，不要在聊天响应中回显令牌内容。
+3. 如果用户提供了 GitHub 令牌，让包装脚本从 `GITHUB_TOKEN` 读取；不要把令牌拼进可见命令文本，不要在聊天响应、日志或错误输出中回显令牌内容。
 4. 读取 JSON 结果，并按以下固定章节归类结论：
    - `[新功能]`
    - `[修复]`
@@ -38,6 +131,7 @@ user-invocable: true
 - 优先使用简洁的 Markdown 列表。
 - 如果某个分类没有结论，就省略该分类。
 - 如果包解析或版本解析失败，概括错误原因，并只追问最小缺失输入。
+- 不要在任何输出中包含 GitHub 令牌原文、部分掩码以外的敏感片段，或可用于恢复令牌的上下文。
 
 ## References
 
