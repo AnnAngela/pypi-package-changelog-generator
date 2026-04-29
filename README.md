@@ -47,7 +47,7 @@
 
 ## 环境要求
 
-- Python 3.12+
+- Python 3.12+ & python3.12-venv 包（Debian/Ubuntu）
 - Linux、macOS 或 Windows（CLI 本身为纯 Python）
 - 如果要发布 Skill：
   - Node.js 24+
