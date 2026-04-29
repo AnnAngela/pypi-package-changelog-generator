@@ -193,12 +193,12 @@ def test_build_file_changes_skips_diff_generation_for_non_python_added_removed_f
     (from_root / "pkg" / "removed.txt").write_text("gone\n", encoding="utf-8")
     (to_root / "pkg" / "added.txt").write_text("new\n", encoding="utf-8")
 
-    def fail_unified_diff(*args: object, **kwargs: object) -> object:
+    def assert_unified_diff_not_called(*args: object, **kwargs: object) -> object:
         raise AssertionError("unified_diff should not be called")
 
     monkeypatch.setattr(
         "pypi_package_changelog_generator.archive_diff.difflib.unified_diff",
-        fail_unified_diff,
+        assert_unified_diff_not_called,
     )
 
     changes = build_file_changes(from_root, to_root)
@@ -209,4 +209,29 @@ def test_build_file_changes_skips_diff_generation_for_non_python_added_removed_f
     )
     assert by_path["pkg/removed.txt"]["patch"] == (
         "diff --git a/pkg/removed.txt b/pkg/removed.txt\ndeleted file mode 100644\n"
+    )
+
+
+def test_build_file_changes_still_generates_diff_for_modified_non_python_files(
+    tmp_path: Path,
+) -> None:
+    from_root = tmp_path / "from"
+    to_root = tmp_path / "to"
+    from_root.mkdir()
+    to_root.mkdir()
+    (from_root / "pkg").mkdir()
+    (to_root / "pkg").mkdir()
+    (from_root / "pkg" / "notes.txt").write_text("before\n", encoding="utf-8")
+    (to_root / "pkg" / "notes.txt").write_text("after\n", encoding="utf-8")
+
+    changes = build_file_changes(from_root, to_root)
+    by_path = {change["path"]: change for change in changes}
+
+    assert by_path["pkg/notes.txt"]["patch"] == (
+        "diff --git a/pkg/notes.txt b/pkg/notes.txt\n"
+        "--- a/pkg/notes.txt\n"
+        "+++ b/pkg/notes.txt\n"
+        "@@ -1 +1 @@\n"
+        "-before\n"
+        "+after\n"
     )
