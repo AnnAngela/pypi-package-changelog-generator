@@ -1,21 +1,6 @@
 # OpenClaw Config
 
-Example `~/.openclaw/openclaw.json` snippet:
-
-```json
-{
-  "skills": {
-    "entries": {
-      "pypi-package-changelog-generator": {
-        "enabled": true,
-        "apiKey": { "source": "env", "provider": "default", "id": "GITHUB_TOKEN" }
-      }
-    }
-  }
-}
-```
-
-You can also inject the token directly:
+Example `~/.openclaw/openclaw.json` snippet for optional token injection:
 
 ```json
 {

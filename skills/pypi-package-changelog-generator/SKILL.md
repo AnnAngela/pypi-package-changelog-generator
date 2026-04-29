@@ -1,7 +1,7 @@
 ---
 name: pypi-package-changelog-generator
 description: 分析 PyPI 包在不同版本之间的变动，并生成结构化的变更日志证据。适用于升级说明、版本差异、release notes、依赖变更、兼容性风险和破坏性变更分析。
-metadata: {"openclaw":{"homepage":"https://github.com/AnnAngela/pypi-package-changelog-generator","primaryEnv":"GITHUB_TOKEN","requires":{"bins":["python3"]}}}
+metadata: {"openclaw":{"homepage":"https://github.com/AnnAngela/pypi-package-changelog-generator","requires":{"bins":["python3"]}}}
 user-invocable: true
 ---
 
@@ -63,7 +63,7 @@ user-invocable: true
 
 ## 可选输入
 
-- GitHub 令牌，可由 OpenClaw 通过 `skills.entries.pypi-package-changelog-generator.apiKey` 或 `skills.entries.pypi-package-changelog-generator.env` 注入为 `GITHUB_TOKEN`。
+- GitHub 令牌，可由 OpenClaw 通过 `skills.entries.pypi-package-changelog-generator.env` 注入为 `GITHUB_TOKEN`。
 
 ## 运行环境
 
