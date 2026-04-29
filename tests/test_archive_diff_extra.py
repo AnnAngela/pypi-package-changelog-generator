@@ -181,6 +181,13 @@ def test_relative_posix_path_normalizes_windows_separators() -> None:
     assert _relative_posix_path(path, root) == "pkg/module.py"
 
 
+def test_relative_posix_path_preserves_posix_paths(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    path = root / "pkg" / "module.py"
+
+    assert _relative_posix_path(path, root) == "pkg/module.py"
+
+
 def test_build_file_changes_skips_diff_generation_for_non_python_added_removed_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -193,12 +200,12 @@ def test_build_file_changes_skips_diff_generation_for_non_python_added_removed_f
     (from_root / "pkg" / "removed.txt").write_text("gone\n", encoding="utf-8")
     (to_root / "pkg" / "added.txt").write_text("new\n", encoding="utf-8")
 
-    def assert_unified_diff_not_called(*args: object, **kwargs: object) -> object:
+    def raise_if_unified_diff_called(*args: object, **kwargs: object) -> object:
         raise AssertionError("unified_diff should not be called")
 
     monkeypatch.setattr(
         "pypi_package_changelog_generator.archive_diff.difflib.unified_diff",
-        assert_unified_diff_not_called,
+        raise_if_unified_diff_called,
     )
 
     changes = build_file_changes(from_root, to_root)
