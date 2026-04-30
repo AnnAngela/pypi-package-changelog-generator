@@ -58,6 +58,7 @@ jobs:
         run: python -S "${{ steps.bundle.outputs.path }}/scripts/invoke.py" --help
 
   publish:
+    name: Publish to ClawHub ${{ github.event.inputs.dry_run == 'true' && '(dry run)' || '' }}
     needs:
       - validate
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
