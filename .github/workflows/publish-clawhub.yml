@@ -79,6 +79,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          package-manager-cache: false
 
       - name: Resolve version and changelog
         id: release
