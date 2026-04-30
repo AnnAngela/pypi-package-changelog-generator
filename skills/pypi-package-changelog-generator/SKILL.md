@@ -114,7 +114,7 @@ user-invocable: true
    - 模式 A：`--package` + `--version-range`
    - 模式 B：`--package` + `--from-version` + `--to-version`
 - 不要同时生成 `--version-range` 和 `--from-version` / `--to-version`。
-- 如果用户没有明确提供 GitHub 令牌，不要主动要求令牌；无令牌也可以运行，只是 GitHub compare 证据可能较弱或更容易受限流影响。
+- 如果环境变量没有明确提供 GitHub 令牌，不要主动要求令牌；无令牌也可以运行，只是 GitHub compare 证据可能较弱或更容易受限流影响。
 
 ## invoke.py 示例
 
@@ -135,33 +135,24 @@ user-invocable: true
    --to-version 0.28.0
 ```
 
-### 示例 3：带环境变量注入的 GitHub 令牌
-
-```bash
-GITHUB_TOKEN=*** {baseDir}/scripts/invoke.py \
-   --package numpy \
-   --version-range '>=1.26,<2.0'
-```
-
 ## OpenClaw 参数提取建议
 
 - 如果用户给出“包名 + 版本范围”，生成 `--package` 与 `--version-range`。
 - 如果用户给出“包名 + 起始版本 + 目标版本”，生成 `--package`、`--from-version`、`--to-version`。
 - 如果用户只给出包名但没有范围或起止版本，先追问最小缺失输入，不要猜测版本。
-- 如果用户提供了 GitHub 令牌，只通过环境变量 `GITHUB_TOKEN` 注入，不要把令牌作为普通文本参数回显，也不要把它改写成 `--github-token` 命令行参数。
+- 如果用户在对话中提供了 GitHub 令牌，提示用户只能通过环境变量 `GITHUB_TOKEN` 提供，不要将令牌通过对话发送，并建议用户立即轮换。
 
 ## 执行步骤
 
 1. 确认包名和版本范围。
 2. 运行 `{baseDir}/scripts/invoke.py`，传入 `--package`，以及 `--version-range` 或同时传入 `--from-version` 和 `--to-version`。
-3. 如果用户提供了 GitHub 令牌，让包装脚本从 `GITHUB_TOKEN` 读取；不要把令牌拼进可见命令文本，不要在聊天响应、日志或错误输出中回显令牌内容。
-4. 读取 JSON 结果，并按以下固定章节归类结论：
+3. 读取 JSON 结果，并按以下固定章节归类结论：
    - `[新功能]`
    - `[修复]`
    - `[破坏性变更]`
    - `[依赖调整]`
    - `[其他]`
-5. 如果结果中报告了截断、压缩包回退或证据较弱，需要明确说明。
+4. 如果结果中报告了截断、压缩包回退或证据较弱，需要明确说明。
 
 ## 输出规则
 
