@@ -130,16 +130,10 @@ jobs:
 
       - name: Publish skill
         shell: bash
+        if: steps.release.outputs.dry_run != 'true'
         run: |
-          set -euo pipefail
-          publish_args=(
-            "${{ steps.bundle.outputs.path }}"
-            --version "${{ steps.release.outputs.version }}"
-            --tags latest
-            --changelog "${{ steps.release.outputs.changelog }}"
+          clawhub skill publish "${{ steps.bundle.outputs.path }}" \
+            --version "${{ steps.release.outputs.version }}" \
+            --tags latest \
+            --changelog "${{ steps.release.outputs.changelog }}" \
             --no-input
-          )
-          if [[ "${{ steps.release.outputs.dry_run }}" == "true" ]]; then
-            publish_args+=(--dry-run)
-          fi
-          clawhub skill publish "${publish_args[@]}"
