@@ -53,6 +53,7 @@ jobs:
           python scripts/build_skill_bundle.py --output "$bundle_dir"
           test -f "$bundle_dir/SKILL.md"
           echo "path=$bundle_dir" >> "$GITHUB_OUTPUT"
+          tree -afh $bundle_dir
 
       - name: Check self-contained skill help
         run: python -S "${{ steps.bundle.outputs.path }}/scripts/invoke.py" --help
@@ -119,6 +120,7 @@ jobs:
           bundle_dir="$RUNNER_TEMP/pypi-package-changelog-generator"
           python scripts/build_skill_bundle.py --output "$bundle_dir"
           echo "path=$bundle_dir" >> "$GITHUB_OUTPUT"
+          tree -afh $bundle_dir
 
       - name: Authenticate ClawHub CLI
         env:
