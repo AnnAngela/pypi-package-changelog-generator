@@ -1,6 +1,6 @@
 name: Publish ClawHub Skill
 
-run-name: Publish ClawHub Skill ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')) && (inputs.dry_run == 'true' && '(dry run)' || '(release)') || '(not release)' }}
+run-name: Publish ClawHub Skill ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') && (github.event.inputs.dry_run == 'true' && '(dry run)' || '(release)') || '(not release)' }}
 
 on:
   pull_request:
@@ -61,7 +61,7 @@ jobs:
         run: python -S "${{ steps.bundle.outputs.path }}/scripts/invoke.py" --help
 
   publish:
-    name: Publish to ClawHub ${{ inputs.dry_run == 'true' && '(dry run)' || '(release)' }}
+    name: Publish to ClawHub ${{ github.event.inputs.dry_run == 'true' && '(dry run)' || '(release)' }}
     needs:
       - validate
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
