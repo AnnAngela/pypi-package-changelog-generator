@@ -5,20 +5,20 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Semver version to publish, for example 0.1.0"
+        description: Semver version to publish, for example 0.1.0
         required: false
       changelog:
-        description: "Release notes for ClawHub"
+        description: Release notes for ClawHub
         required: false
       dry_run:
-        description: "If true, will go through all steps except actually publishing to ClawHub"
+        description: If true, will go through all steps except actually publishing to ClawHub
         required: false
         type: boolean
   push:
     branches:
-      - "master"
+      - master
     tags:
-      - "v*"
+      - v*
 
 jobs:
   validate:
