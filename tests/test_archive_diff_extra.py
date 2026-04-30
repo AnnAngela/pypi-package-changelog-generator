@@ -3,7 +3,7 @@ from __future__ import annotations
 import tarfile
 import tempfile
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -13,6 +13,7 @@ from pypi_package_changelog_generator.archive_diff import (
     ExtractedArchive,
     _decode_lines,
     _is_safe_tar_member,
+    _relative_posix_path,
     _should_skip,
     build_file_changes,
     compare_release_archives,
@@ -101,7 +102,9 @@ def test_build_file_changes_covers_added_removed_modified_binary_and_skipped_fil
     (from_root / "pkg" / "old.txt").write_text("rename me\n", encoding="utf-8")
     (to_root / "pkg" / "new.txt").write_text("rename me\n", encoding="utf-8")
     (to_root / "pkg" / "added.txt").write_text("one\ntwo\n", encoding="utf-8")
+    (to_root / "pkg" / "added.py").write_text("print('new')\n", encoding="utf-8")
     (from_root / "pkg" / "removed.txt").write_text("gone\n", encoding="utf-8")
+    (from_root / "pkg" / "removed.md").write_text("# gone\n", encoding="utf-8")
     (from_root / "pkg" / "unchanged.txt").write_text("same\n", encoding="utf-8")
     (to_root / "pkg" / "unchanged.txt").write_text("same\n", encoding="utf-8")
     (from_root / "pkg" / "image.bin").write_bytes(b"\0before")
@@ -115,10 +118,26 @@ def test_build_file_changes_covers_added_removed_modified_binary_and_skipped_fil
 
     assert by_path["pkg/new.txt"]["status"] == "renamed"
     assert by_path["pkg/added.txt"]["additions"] == 2
+    assert by_path["pkg/added.py"]["additions"] == 1
     assert by_path["pkg/removed.txt"]["deletions"] == 1
+    assert by_path["pkg/removed.md"]["deletions"] == 1
     assert by_path["pkg/same.py"]["status"] == "modified"
-    assert by_path["pkg/same.py"]["patch"].startswith("--- a/pkg/same.py")
-    assert by_path["pkg/image.bin"]["patch"] is None
+    assert by_path["pkg/same.py"]["patch"].startswith(
+        "diff --git a/pkg/same.py b/pkg/same.py"
+    )
+    assert by_path["pkg/added.txt"]["patch"] == (
+        "diff --git a/pkg/added.txt b/pkg/added.txt\nnew file mode 100644\n"
+    )
+    assert by_path["pkg/added.py"]["patch"].startswith(
+        "diff --git a/pkg/added.py b/pkg/added.py\nnew file mode 100644\n--- /dev/null\n"
+    )
+    assert by_path["pkg/removed.md"]["patch"].startswith(
+        "diff --git a/pkg/removed.md b/pkg/removed.md\ndeleted file mode 100644\n--- a/pkg/removed.md\n"
+    )
+    assert by_path["pkg/image.bin"]["patch"] == (
+        "diff --git a/pkg/image.bin b/pkg/image.bin\n"
+        "Binary files a/pkg/image.bin and b/pkg/image.bin differ\n"
+    )
     assert _decode_lines(b"line1\nline2\n") == ["line1\n", "line2\n"]
     assert _should_skip(Path(".git/ignored.txt")) is True
     assert _should_skip(Path("pkg/compiled.pyc")) is True
@@ -153,3 +172,73 @@ def test_archive_cleanup_helpers_remove_temporary_directories() -> None:
 
     assert not Path(temp_a.name).exists()
     assert not Path(temp_b.name).exists()
+
+
+def test_relative_posix_path_normalizes_windows_separators() -> None:
+    path = PureWindowsPath(r"C:\repo\pkg\module.py")
+    root = PureWindowsPath(r"C:\repo")
+
+    assert _relative_posix_path(path, root) == "pkg/module.py"
+
+
+def test_relative_posix_path_preserves_posix_paths(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    path = root / "pkg" / "module.py"
+
+    assert _relative_posix_path(path, root) == "pkg/module.py"
+
+
+def test_build_file_changes_skips_diff_generation_for_non_python_added_removed_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from_root = tmp_path / "from"
+    to_root = tmp_path / "to"
+    from_root.mkdir()
+    to_root.mkdir()
+    (from_root / "pkg").mkdir()
+    (to_root / "pkg").mkdir()
+    (from_root / "pkg" / "removed.txt").write_text("gone\n", encoding="utf-8")
+    (to_root / "pkg" / "added.txt").write_text("new\n", encoding="utf-8")
+
+    def raise_if_unified_diff_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("unified_diff should not be called")
+
+    monkeypatch.setattr(
+        "pypi_package_changelog_generator.archive_diff.difflib.unified_diff",
+        raise_if_unified_diff_called,
+    )
+
+    changes = build_file_changes(from_root, to_root)
+    by_path = {change["path"]: change for change in changes}
+
+    assert by_path["pkg/added.txt"]["patch"] == (
+        "diff --git a/pkg/added.txt b/pkg/added.txt\nnew file mode 100644\n"
+    )
+    assert by_path["pkg/removed.txt"]["patch"] == (
+        "diff --git a/pkg/removed.txt b/pkg/removed.txt\ndeleted file mode 100644\n"
+    )
+
+
+def test_build_file_changes_still_generates_diff_for_modified_non_python_files(
+    tmp_path: Path,
+) -> None:
+    from_root = tmp_path / "from"
+    to_root = tmp_path / "to"
+    from_root.mkdir()
+    to_root.mkdir()
+    (from_root / "pkg").mkdir()
+    (to_root / "pkg").mkdir()
+    (from_root / "pkg" / "notes.txt").write_text("before\n", encoding="utf-8")
+    (to_root / "pkg" / "notes.txt").write_text("after\n", encoding="utf-8")
+
+    changes = build_file_changes(from_root, to_root)
+    by_path = {change["path"]: change for change in changes}
+
+    assert by_path["pkg/notes.txt"]["patch"] == (
+        "diff --git a/pkg/notes.txt b/pkg/notes.txt\n"
+        "--- a/pkg/notes.txt\n"
+        "+++ b/pkg/notes.txt\n"
+        "@@ -1 +1 @@\n"
+        "-before\n"
+        "+after\n"
+    )

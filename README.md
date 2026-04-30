@@ -21,7 +21,7 @@
 - 优先使用 GitHub compare 获取提交、PR 和文件变化
 - 无法使用 GitHub compare 时回退到 PyPI sdist 归档比较
 - 提取依赖变更、元数据变化和潜在破坏性升级信号
-- 输出稳定的 JSON 结构，适合被 Skill 或其他自动化流程消费
+- 输出稳定的 JSON 结构，其中 `file_changes[*].patch` 为 git diff 风格文本，适合被 Skill 或其他自动化流程消费
 
 ## 仓库结构
 
@@ -164,6 +164,12 @@ CLI 输出为 JSON，包含以下高层字段：
 - `breaking_signals`
 - `warnings`
 - `errors`
+
+其中 `file_changes[*].patch` 使用 git diff 风格文本：
+
+- `.py`、`.md` 文件保留完整差异，不做证据预算截断
+- 非 `.py`、`.md` 文件中，新增/删除文件只保留文件头，不展示正文
+- 其他非 `.py`、`.md` 文件在超出预算时会截断
 
 当 GitHub compare 不可用时，`mode` 可能回退为 `archive`；当两种证据都无法提供有效结果时，`mode` 会是 `error`。
 

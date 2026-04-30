@@ -63,6 +63,25 @@ def test_provider_base_types_raise_expected_errors() -> None:
 def test_compare_versions_collects_commits_reviews_and_warning() -> None:
     compare_files = [
         {
+            "filename": "pkg/file-0.py",
+            "previous_filename": None,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 0,
+            "changes": 1,
+            "patch": "@@ -1 +1 @@\n-old\n+new\n",
+        },
+        {
+            "filename": "pkg/file-1.txt",
+            "previous_filename": None,
+            "status": "added",
+            "additions": 1,
+            "deletions": 0,
+            "changes": 1,
+            "patch": "@@ -0,0 +1 @@\n+new\n",
+        },
+    ] + [
+        {
             "filename": f"pkg/file-{index}.py",
             "previous_filename": None,
             "status": "modified",
@@ -71,7 +90,7 @@ def test_compare_versions_collects_commits_reviews_and_warning() -> None:
             "changes": 1,
             "patch": "+1",
         }
-        for index in range(300)
+        for index in range(2, 300)
     ]
     responses = {
         "/repos/AnnAngela/demo/tags": [
@@ -132,6 +151,12 @@ def test_compare_versions_collects_commits_reviews_and_warning() -> None:
     assert result["commits"][0]["title"] == "Subject line"
     assert result["reviews"][0]["number"] == 7
     assert result["file_changes"][0]["path"] == "pkg/file-0.py"
+    assert result["file_changes"][0]["patch"].startswith(
+        "diff --git a/pkg/file-0.py b/pkg/file-0.py\n--- a/pkg/file-0.py\n"
+    )
+    assert result["file_changes"][1]["patch"] == (
+        "diff --git a/pkg/file-1.txt b/pkg/file-1.txt\nnew file mode 100644\n"
+    )
     assert result["warnings"][0].code == "github_file_limit"
 
 

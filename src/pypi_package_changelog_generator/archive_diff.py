@@ -6,9 +6,10 @@ import tarfile
 import tempfile
 from dataclasses import dataclass
 from io import BytesIO
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Any
 
+from pypi_package_changelog_generator.diff_text import format_git_diff_patch, omit_diff_body
 from pypi_package_changelog_generator.pypi_client import PypiClient, PypiClientError
 
 
@@ -130,7 +131,11 @@ def build_file_changes(from_root: Path, to_root: Path) -> list[dict[str, Any]]:
                 "additions": 0,
                 "deletions": 0,
                 "changes": 0,
-                "patch": None,
+                "patch": format_git_diff_patch(
+                    path=new_path,
+                    previous_path=old_path,
+                    status="renamed",
+                ),
             }
         )
 
@@ -153,7 +158,7 @@ def _collect_files(root: Path) -> dict[str, dict[str, Any]]:
         if not path.is_file() or _should_skip(path.relative_to(root)):
             continue
         content = path.read_bytes()
-        files[str(path.relative_to(root))] = {
+        files[_relative_posix_path(path, root)] = {
             "hash": hashlib.sha1(content).hexdigest(),
             "size": len(content),
             "binary": b"\0" in content[:4096],
@@ -195,7 +200,7 @@ def _create_change(
     additions = 0
     deletions = 0
     if before and after and not before["binary"] and not after["binary"]:
-        patch = "".join(
+        raw_patch = "".join(
             difflib.unified_diff(
                 before_lines,
                 after_lines,
@@ -204,20 +209,41 @@ def _create_change(
                 n=3,
             )
         )
+        patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
         additions = sum(
             1
-            for line in patch.splitlines()
+            for line in raw_patch.splitlines()
             if line.startswith("+") and not line.startswith("+++")
         )
         deletions = sum(
             1
-            for line in patch.splitlines()
+            for line in raw_patch.splitlines()
             if line.startswith("-") and not line.startswith("---")
         )
     elif after and not after["binary"]:
         additions = len(after_lines)
+        raw_patch = _build_single_sided_patch(
+            path=path,
+            status=status,
+            before_lines=[],
+            after_lines=after_lines,
+        )
+        patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
     elif before and not before["binary"]:
         deletions = len(before_lines)
+        raw_patch = _build_single_sided_patch(
+            path=path,
+            status=status,
+            before_lines=before_lines,
+            after_lines=[],
+        )
+        patch = format_git_diff_patch(path=path, status=status, patch=raw_patch)
+    elif before or after:
+        patch = format_git_diff_patch(
+            path=path,
+            status=status,
+            binary=True,
+        )
 
     return {
         "path": path,
@@ -232,6 +258,32 @@ def _create_change(
 
 def _decode_lines(content: bytes) -> list[str]:
     return content.decode("utf-8", errors="replace").splitlines(keepends=True)
+
+
+def _build_single_sided_patch(
+    *,
+    path: str,
+    status: str,
+    before_lines: list[str],
+    after_lines: list[str],
+) -> str | None:
+    """Build a unified diff for added or removed text files when body output is needed."""
+    if omit_diff_body(path, status):
+        return None
+    return "".join(
+        difflib.unified_diff(
+            before_lines,
+            after_lines,
+            fromfile="/dev/null" if status == "added" else f"a/{path}",
+            tofile="/dev/null" if status == "removed" else f"b/{path}",
+            n=3,
+        )
+    )
+
+
+def _relative_posix_path(path: PurePath, root: PurePath) -> str:
+    """Return a root-relative path with POSIX separators for git-style diff labels."""
+    return path.relative_to(root).as_posix()
 
 
 def _should_skip(path: Path) -> bool:

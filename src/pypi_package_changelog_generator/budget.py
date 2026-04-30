@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pypi_package_changelog_generator.diff_text import keeps_full_patch, truncate_patch
 from pypi_package_changelog_generator.models import ChangelogResult
 
 
@@ -21,9 +22,13 @@ def apply_budget(
 
     for change in result.file_changes:
         patch = change.get("patch")
-        if not patch or len(patch) <= max_patch_chars:
+        if (
+            not patch
+            or keeps_full_patch(change.get("path"))
+            or len(patch) <= max_patch_chars
+        ):
             continue
-        change["patch"] = patch[:max_patch_chars].rstrip() + "\n...<truncated>...\n"
+        change["patch"] = truncate_patch(patch, max_patch_chars)
         result.truncation.truncated = True
         result.truncation.reason = (
             "patch excerpts were shortened to fit the evidence budget"

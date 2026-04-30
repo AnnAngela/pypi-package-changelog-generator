@@ -10,7 +10,7 @@ from pypi_package_changelog_generator._http import (
     HttpTransport,
     HttpTransportError,
 )
-
+from pypi_package_changelog_generator.diff_text import format_git_diff_patch
 from pypi_package_changelog_generator.models import WarningInfo
 from pypi_package_changelog_generator.providers.base import (
     ProviderError,
@@ -93,7 +93,12 @@ class GitHubProvider(RepositoryProvider):
                 "additions": file_info.get("additions", 0),
                 "deletions": file_info.get("deletions", 0),
                 "changes": file_info.get("changes", 0),
-                "patch": file_info.get("patch"),
+                "patch": format_git_diff_patch(
+                    path=file_info.get("filename"),
+                    previous_path=file_info.get("previous_filename"),
+                    status=file_info.get("status"),
+                    patch=file_info.get("patch"),
+                ),
             }
             for file_info in payload.get("files", [])
         ]
