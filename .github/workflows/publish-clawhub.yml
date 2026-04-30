@@ -10,6 +10,10 @@ on:
       changelog:
         description: "Release notes for ClawHub"
         required: false
+      dry_run:
+        description: "If true, will go through all steps except actually publishing to ClawHub"
+        required: false
+        type: boolean
   push:
     branches:
       - "master"
@@ -26,11 +30,12 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: 3.12
+          cache: pip
+          pip-version: 26
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           python -m pip install -e .[dev]
 
       - name: Run tests
@@ -64,16 +69,15 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: 3.12
+          cache: pip
+          pip-version: 26
+          pip-install: packaging
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "24"
-
-      - name: Install bundle builder runtime
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install packaging
+          node-version: 24
+          cache: npm
 
       - name: Resolve version and changelog
         id: release
@@ -83,9 +87,11 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             version="${GITHUB_REF_NAME#v}"
             changelog="Release ${version}"
+            dry_run=false
           else
             version="${{ github.event.inputs.version }}"
             changelog="${{ github.event.inputs.changelog || '' }}"
+            dry_run="${{ github.event.inputs.dry_run }}"
             if [[ -z "$version" ]]; then
               echo "workflow_dispatch requires a version input" >&2
               exit 1
@@ -100,6 +106,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "changelog=$changelog" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
 
       - name: Install ClawHub CLI
         run: npm install -g clawhub
@@ -122,9 +129,17 @@ jobs:
           clawhub whoami --no-input
 
       - name: Publish skill
+        shell: bash
         run: |
-          clawhub skill publish "${{ steps.bundle.outputs.path }}" \
-            --version "${{ steps.release.outputs.version }}" \
-            --tags latest \
-            --changelog "${{ steps.release.outputs.changelog }}" \
+          set -euo pipefail
+          publish_args=(
+            "${{ steps.bundle.outputs.path }}"
+            --version "${{ steps.release.outputs.version }}"
+            --tags latest
+            --changelog "${{ steps.release.outputs.changelog }}"
             --no-input
+          )
+          if [[ "${{ steps.release.outputs.dry_run }}" == "true" ]]; then
+            publish_args+=(--dry-run)
+          fi
+          clawhub skill publish "${publish_args[@]}"
